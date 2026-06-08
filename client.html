@@ -17,6 +17,7 @@
   <script>
     (function () {
       var wsURL = 'ws://' + location.host + '?role=client';
+      var lastRatio = -1;
       function connect() {
         var ws = new WebSocket(wsURL);
         var status = document.getElementById('status');
@@ -30,7 +31,13 @@
             document.write(m.html);
             document.close();
           } else if (m.type === 'scroll') {
-            window.scrollTo(0, m.y);
+            if (m.ratio !== lastRatio) {
+              var down = m.ratio > lastRatio;
+              lastRatio = m.ratio;
+              var clientRatio = window.scrollY / Math.max(1, document.documentElement.scrollHeight);
+              if ((down && m.ratio > clientRatio) || (!down && m.ratio < clientRatio))
+                window.scrollTo(0, m.ratio * document.documentElement.scrollHeight);
+            }
           }
         };
         ws.onclose = function () {
