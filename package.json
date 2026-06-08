@@ -1,0 +1,19 @@
+{
+  "name": "circle-sync",
+  "version": "1.0.0",
+  "description": "Local WiFi singing circle sync app",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.0.0"
+  }
+}

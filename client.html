@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>circle-sync client</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #a8b2d8; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; text-align: center; padding: 2rem; }
+    #status { font-size: 1.2rem; margin-bottom: 1rem; }
+    #status.connected { color: #64ffda; }
+    #status.disconnected { color: #e94560; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: currentColor; margin-right: 6px; }
+  </style>
+</head>
+<body>
+  <p id="status" class="disconnected"><span class="dot"></span>Waiting for master…</p>
+  <script>
+    (function () {
+      var wsURL = 'ws://' + location.host + '?role=client';
+      function connect() {
+        var ws = new WebSocket(wsURL);
+        var status = document.getElementById('status');
+        ws.onopen = function () {
+          if (status) { status.className = 'connected'; status.innerHTML = '<span class="dot"></span>Connected'; }
+        };
+        ws.onmessage = function (e) {
+          var m = JSON.parse(e.data);
+          if (m.type === 'page') {
+            document.open();
+            document.write(m.html);
+            document.close();
+          } else if (m.type === 'scroll') {
+            window.scrollTo(0, m.y);
+          }
+        };
+        ws.onclose = function () {
+          if (status) { status.className = 'disconnected'; status.innerHTML = '<span class="dot"></span>Reconnecting…'; }
+          setTimeout(connect, 2000);
+        };
+      }
+      connect();
+    })();
+  </script>
+</body>
+</html>
