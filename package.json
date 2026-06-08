@@ -7,13 +7,15 @@
   "scripts": {
     "start": "node server.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test --config=playwright.config.cjs"
   },
   "dependencies": {
     "qrcode": "^1.5.4",
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "vitest": "^2.0.0"
   }
 }

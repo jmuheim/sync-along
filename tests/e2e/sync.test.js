@@ -1,0 +1,288 @@
+import { test, expect } from '@playwright/test';
+import { createServer } from '../../server.js';
+import { buildBookmarkletSource, buildClientScript } from '../../lib/bookmarklet.js';
+
+const PORT = 3001;
+const BASE = `http://localhost:${PORT}`;
+const WS = `ws://localhost:${PORT}`;
+
+let server;
+
+test.beforeAll(async () => {
+  server = createServer();
+  await new Promise((resolve) => server.httpServer.listen(PORT, resolve));
+});
+
+test.afterAll(async () => {
+  // Close all open WebSocket connections so httpServer.close() can drain
+  server.wss.clients.forEach((ws) => ws.terminate());
+  await new Promise((resolve) => server.wss.close(resolve));
+  await new Promise((resolve) => server.httpServer.close(resolve));
+});
+
+// ─── Index page ────────────────────────────────────────────────────────────────
+
+test('index page shows bookmarklet link, QR image, and client URL', async ({ page }) => {
+  await page.goto(BASE);
+  const bookmarkletHref = await page.locator('a.bookmarklet').getAttribute('href');
+  expect(bookmarkletHref).toMatch(/^javascript:/);
+  expect(await page.locator('img[alt="QR code"]').isVisible()).toBe(true);
+  // Server renders the LAN IP, not localhost — just verify the link ends with /client.html
+  const clientHref = await page.locator('a.url').getAttribute('href');
+  expect(clientHref).toMatch(/\/client\.html$/);
+  expect(await page.locator('a.url').isVisible()).toBe(true);
+});
+
+// ─── Client page initial state ─────────────────────────────────────────────────
+
+test('client page loads and shows disconnected status, then connected after WS opens', async ({ page }) => {
+  await page.goto(`${BASE}/client.html`);
+  // Give WS time to connect
+  await expect(page.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+  expect(await page.locator('#status').innerText()).toContain('Connected');
+});
+
+// ─── Page sync ─────────────────────────────────────────────────────────────────
+
+test('master sending a page message updates all connected clients', async ({ browser }) => {
+  const client1 = await browser.newPage();
+  const client2 = await browser.newPage();
+
+  await client1.goto(`${BASE}/client.html`);
+  await client2.goto(`${BASE}/client.html`);
+
+  // Wait for both clients to connect
+  await expect(client1.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+  await expect(client2.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  // Inject a master WebSocket and send a page message
+  const clientScript = buildClientScript(`${WS}`);
+  const sentHTML = `<!DOCTYPE html><html><head></head><body><p id="synced-content">Hello from master</p><script>${clientScript}<\/script></body></html>`;
+
+  await client1.evaluate(async ({ wsURL, html }) => {
+    await new Promise((resolve, reject) => {
+      const ws = new WebSocket(`${wsURL}?role=master`);
+      ws.onopen = () => { ws.send(JSON.stringify({ type: 'page', html })); ws.close(); resolve(); };
+      ws.onerror = reject;
+    });
+  }, { wsURL: WS, html: sentHTML });
+
+  // Both clients should now show the synced content
+  await expect(client1.locator('#synced-content')).toBeVisible({ timeout: 5000 });
+  await expect(client2.locator('#synced-content')).toBeVisible({ timeout: 5000 });
+
+  await client1.close();
+  await client2.close();
+});
+
+// ─── Scroll sync ───────────────────────────────────────────────────────────────
+
+test('master scroll message moves client scroll position', async ({ browser }) => {
+  // Build a tall page with the client script already injected so it reconnects
+  const clientScript = buildClientScript(WS);
+  const tallPageHTML = `<!DOCTYPE html><html><head></head><body style="height:5000px"><p id="top">top</p><p id="bottom" style="position:absolute;top:4900px">bottom</p><script>${clientScript}<\/script></body></html>`;
+
+  const masterPage = await browser.newPage();
+  const clientPage = await browser.newPage();
+
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  // Master sends the tall page first, then a scroll to 98%
+  await masterPage.evaluate(async ({ wsURL, html }) => {
+    await new Promise((resolve, reject) => {
+      const ws = new WebSocket(`${wsURL}?role=master`);
+      ws.onopen = async () => {
+        ws.send(JSON.stringify({ type: 'page', html }));
+        await new Promise(r => setTimeout(r, 300));
+        ws.send(JSON.stringify({ type: 'scroll', ratio: 0.98 }));
+        ws.close();
+        resolve();
+      };
+      ws.onerror = reject;
+    });
+  }, { wsURL: WS, html: tallPageHTML });
+
+  // Client should have scrolled down
+  await expect(async () => {
+    const scrollY = await clientPage.evaluate(() => window.scrollY);
+    expect(scrollY).toBeGreaterThan(1000);
+  }).toPass({ timeout: 5000 });
+
+  await masterPage.close();
+  await clientPage.close();
+});
+
+// ─── Client reconnect after document.write ─────────────────────────────────────
+
+test('client re-establishes WebSocket after document.write replaces the page', async ({ browser }) => {
+  const clientScript = buildClientScript(WS);
+  const replacementHTML = `<!DOCTYPE html><html><head></head><body><p id="replaced">replaced</p><script>${clientScript}<\/script></body></html>`;
+
+  const masterPage = await browser.newPage();
+  const clientPage = await browser.newPage();
+
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  // First page replacement
+  await masterPage.evaluate(async ({ wsURL, html }) => {
+    await new Promise((resolve, reject) => {
+      const ws = new WebSocket(`${wsURL}?role=master`);
+      ws.onopen = () => { ws.send(JSON.stringify({ type: 'page', html })); ws.close(); resolve(); };
+      ws.onerror = reject;
+    });
+  }, { wsURL: WS, html: replacementHTML });
+
+  await expect(clientPage.locator('#replaced')).toBeVisible({ timeout: 5000 });
+
+  // After document.write the injected client script should have reconnected.
+  // Send a second page message to confirm the client is still listening.
+  const secondHTML = `<!DOCTYPE html><html><head></head><body><p id="second-replaced">second</p><script>${clientScript}<\/script></body></html>`;
+
+  await masterPage.evaluate(async ({ wsURL, html }) => {
+    await new Promise((resolve, reject) => {
+      const ws = new WebSocket(`${wsURL}?role=master`);
+      ws.onopen = () => { ws.send(JSON.stringify({ type: 'page', html })); ws.close(); resolve(); };
+      ws.onerror = reject;
+    });
+  }, { wsURL: WS, html: secondHTML });
+
+  await expect(clientPage.locator('#second-replaced')).toBeVisible({ timeout: 8000 });
+
+  await masterPage.close();
+  await clientPage.close();
+});
+
+// ─── Bookmarklet pick mode ──────────────────────────────────────────────────────
+
+test('bookmarklet enters pick mode: dims page, shows hint and share button; picking an element shares it and shows master view', async ({ browser }) => {
+  const songContext = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  const songPage = await songContext.newPage();
+
+  // Navigate to a real origin first so sessionStorage is available inside the bookmarklet
+  await songPage.goto(BASE);
+  // Put lyrics in the top-left corner so it's away from the centred hint overlay
+  await songPage.setContent(`
+    <html><body style="margin:0">
+      <div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Amazing grace</p></div>
+      <div id="other" style="position:absolute;top:100px">other content</div>
+    </body></html>
+  `);
+
+  const clientScript = buildClientScript(WS);
+  const bookmarkletCode = buildBookmarkletSource(WS, clientScript);
+
+  await songPage.evaluate(bookmarkletCode);
+
+  // Pick mode active: overlay, hint, and share button all visible
+  await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(songPage.getByText('Tap the lyrics container')).toBeVisible();
+  await expect(songPage.getByText('Share whole page')).toBeVisible();
+
+  const clientPage = await browser.newPage();
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  // Dispatch a click directly at the lyrics element's coordinates so elementFromPoint
+  // returns it reliably (Playwright's .click() goes through the accessibility tree which
+  // respects pointer-events:none on the overlay, but elementFromPoint inside the handler
+  // may still return an overlay element if the hint covers the target)
+  const box = await songPage.locator('#lyrics').boundingBox();
+  await songPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+  // Overlay must be cleaned up after pick
+  await expect(songPage.locator('#__circleSyncOverlay')).not.toBeAttached({ timeout: 3000 });
+
+  // Master view overlay should appear
+  await expect(songPage.locator('#__circleSyncView')).toBeVisible({ timeout: 5000 });
+
+  // Client should have received the picked content
+  await expect(clientPage.getByText('Amazing grace')).toBeVisible({ timeout: 5000 });
+
+  await songContext.close();
+  await clientPage.close();
+});
+
+// ─── Bookmarklet "Share whole page" button ─────────────────────────────────────
+
+test('"Share whole page" sends full body to clients without entering pick', async ({ browser }) => {
+  const songContext = await browser.newContext();
+  const songPage = await songContext.newPage();
+  await songPage.setContent(`<html><body><article id="full-article">Full content</article></body></html>`);
+
+  const clientScript = buildClientScript(WS);
+  const bookmarkletCode = buildBookmarkletSource(WS, clientScript);
+  await songPage.evaluate(bookmarkletCode);
+
+  await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+
+  const clientPage = await browser.newPage();
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  await songPage.getByText('Share whole page').click();
+
+  await expect(clientPage.getByText('Full content')).toBeVisible({ timeout: 5000 });
+  // The share button must not appear in the sent HTML
+  await expect(clientPage.getByText('Share whole page')).not.toBeVisible();
+
+  await songContext.close();
+  await clientPage.close();
+});
+
+// ─── Selector memory ───────────────────────────────────────────────────────────
+
+test('selector memory: second bookmarklet tap on same domain shows saved-element prompt', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  const page = await ctx.newPage();
+  await page.goto(BASE);
+  await page.setContent(`<html><body style="margin:0"><div id="lyrics" class="verse" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Amazing grace</p></div></body></html>`);
+
+  const clientScript = buildClientScript(WS);
+  const code = buildBookmarkletSource(WS, clientScript);
+
+  // First activation — pick an element to store the selector
+  await page.evaluate(code);
+  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  const box = await page.locator('#lyrics').boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.locator('#__circleSyncView')).toBeVisible({ timeout: 5000 });
+
+  // Clean up master state and run the bookmarklet again on the same page
+  await page.evaluate(() => { if (window.__circleSyncCleanup) window.__circleSyncCleanup(); });
+  await page.evaluate(code);
+
+  // Should show the saved-element prompt instead of full pick mode
+  await expect(page.getByText('Using saved element')).toBeVisible({ timeout: 5000 });
+  await expect(page.getByText('Use it')).toBeVisible();
+  await expect(page.getByText('Change?')).toBeVisible();
+  // Full pick mode overlay should NOT appear
+  await expect(page.locator('#__circleSyncOverlay')).not.toBeAttached();
+
+  await ctx.close();
+});
+
+// ─── Bookmarklet re-tap cleanup ────────────────────────────────────────────────
+
+test('re-tapping bookmarklet cleans up previous WS and pick mode', async ({ browser }) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto(BASE);
+  await page.setContent(`<html><body><div id="lyrics">Lyrics</div></body></html>`);
+
+  const clientScript = buildClientScript(WS);
+  const code = buildBookmarkletSource(WS, clientScript);
+
+  // First tap — wait for pick mode to start
+  await page.evaluate(code);
+  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+
+  // Second tap: cleanup runs synchronously, then pick mode restarts once ws.onopen fires
+  await page.evaluate(code);
+  // Wait for the new overlay to appear, then confirm there's exactly one (no stacking)
+  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  expect(await page.locator('#__circleSyncOverlay').count()).toBe(1);
+
+  await ctx.close();
+});
