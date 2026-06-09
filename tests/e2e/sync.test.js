@@ -194,8 +194,8 @@ test('bookmarklet enters pick mode: dims page, shows hint and share button; pick
   // Overlay must be cleaned up after pick
   await expect(songPage.locator('#__circleSyncOverlay')).not.toBeAttached({ timeout: 3000 });
 
-  // Master view overlay should appear
-  await expect(songPage.locator('#__circleSyncView')).toBeVisible({ timeout: 5000 });
+  // Master view iframe should appear — same HTML as sent to clients
+  await expect(songPage.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
 
   // Client should have received the picked content
   await expect(clientPage.getByText('Amazing grace')).toBeVisible({ timeout: 5000 });
@@ -223,6 +223,8 @@ test('"Share whole page" sends full body to clients without entering pick', asyn
 
   await songPage.getByText('Share whole page').click();
 
+  // Master should now see the same iframe view as clients
+  await expect(songPage.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
   await expect(clientPage.getByText('Full content')).toBeVisible({ timeout: 5000 });
   // The share button must not appear in the sent HTML
   await expect(clientPage.getByText('Share whole page')).not.toBeVisible();
@@ -247,7 +249,7 @@ test('selector memory: second bookmarklet tap on same domain shows saved-element
   await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
   const box = await page.locator('#lyrics').boundingBox();
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await expect(page.locator('#__circleSyncView')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
 
   // Clean up master state and run the bookmarklet again on the same page
   await page.evaluate(() => { if (window.__circleSyncCleanup) window.__circleSyncCleanup(); });
@@ -361,7 +363,7 @@ test('selector memory "Use it" shares the saved element and shows master view', 
   await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
   const box = await songPage.locator('#lyrics').boundingBox();
   await songPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await expect(songPage.locator('#__circleSyncView')).toBeVisible({ timeout: 5000 });
+  await expect(songPage.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
 
   // Set up client, then re-tap to get the saved-element prompt
   const clientPage = await browser.newPage();
@@ -374,7 +376,7 @@ test('selector memory "Use it" shares the saved element and shows master view', 
 
   // Click "Use it" — should share the saved element and show master view
   await songPage.getByRole('button', { name: 'Use it' }).click();
-  await expect(songPage.locator('#__circleSyncView')).toBeVisible({ timeout: 5000 });
+  await expect(songPage.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
   await expect(clientPage.getByText('Amazing grace saved')).toBeVisible({ timeout: 5000 });
 
   await ctx.close();
@@ -395,7 +397,7 @@ test('selector memory "Change?" re-enters pick mode', async ({ browser }) => {
   await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
   const box = await page.locator('#lyrics').boundingBox();
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await expect(page.locator('#__circleSyncView')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
 
   // Re-tap to get the saved-element prompt
   await page.evaluate(() => { if (window.__circleSyncCleanup) window.__circleSyncCleanup(); });
@@ -426,14 +428,14 @@ test('master view close button dismisses the overlay', async ({ browser }) => {
   await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
   const box = await page.locator('#lyrics').boundingBox();
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await expect(page.locator('#__circleSyncView')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
 
   // Close button must be visible alongside the master view
   await expect(page.locator('#__circleSyncCloseBtn')).toBeVisible();
 
   await page.locator('#__circleSyncCloseBtn').click();
 
-  await expect(page.locator('#__circleSyncView')).not.toBeAttached({ timeout: 3000 });
+  await expect(page.locator('iframe#__circleSyncView')).not.toBeAttached({ timeout: 3000 });
   await expect(page.locator('#__circleSyncCloseBtn')).not.toBeAttached();
 
   await ctx.close();
