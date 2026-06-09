@@ -69,7 +69,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { httpServer } = createServer();
   const ip = getLocalIP();
   httpServer.listen(PORT, () => {
-    console.log(`circle-sync running at http://${ip}:${PORT}`);
+    console.log(`Sync Along running at http://${ip}:${PORT}`);
     console.log(`Local:   http://localhost:${PORT}`);
   });
 }

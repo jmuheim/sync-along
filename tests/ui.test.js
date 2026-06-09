@@ -17,7 +17,7 @@ describe('buildIndexHTML', () => {
     expect(html).toContain('javascript:');
   });
 
-  it('contains the circle-sync bookmarklet anchor', async () => {
+  it('contains the Sync Along bookmarklet anchor', async () => {
     const html = await buildIndexHTML('192.168.1.1', 3000);
     expect(html).toContain('class="bookmarklet"');
   });

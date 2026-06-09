@@ -1,6 +1,6 @@
-# circle-sync
+# Sync Along
 
-A local WiFi app for singing circles where a master device controls what song/page all client devices see. The master browses normally, taps a bookmarklet to share the current page, and all connected clients instantly see the same page and follow the master's scroll position.
+A local WiFi app for singing circles where a leader's device controls what song/page everyone else sees. The leader browses normally, taps a bookmarklet to share the current page, and all participants instantly see the same page and follow along with the scroll position — so the whole circle can sing along together.
 
 ## Setup
 

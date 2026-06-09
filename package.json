@@ -1,5 +1,5 @@
 {
-  "name": "circle-sync",
+  "name": "sync-along",
   "version": "1.0.0",
   "description": "Local WiFi singing circle sync app",
   "main": "server.js",
