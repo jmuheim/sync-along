@@ -6,20 +6,33 @@
   <title>circle-sync client</title>
   <style>
     body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #a8b2d8; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; text-align: center; padding: 2rem; }
-    #status { font-size: 1.2rem; margin-bottom: 1rem; }
+    #status { font-size: 1.2rem; margin-bottom: 1.5rem; }
     #status.connected { color: #64ffda; }
     #status.disconnected { color: #e94560; }
     .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: currentColor; margin-right: 6px; }
+    #propose-btn { background: #0f3460; color: #a8b2d8; border: 1px solid #a8b2d8; padding: 0.4rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-family: inherit; }
+    #propose-btn:hover { border-color: #64ffda; color: #64ffda; }
+    #propose-form { display: none; flex-direction: column; align-items: center; gap: 0.5rem; margin-top: 0.75rem; }
+    #propose-url { background: #1a1a2e; color: #eee; border: 1px solid #a8b2d8; padding: 0.4rem 0.6rem; border-radius: 4px; font-size: 0.9rem; font-family: inherit; width: 240px; }
+    #propose-url:focus { outline: none; border-color: #64ffda; }
+    #propose-submit { background: #64ffda; color: #0f3460; border: none; padding: 0.4rem 0.9rem; border-radius: 4px; cursor: pointer; font-weight: bold; font-family: inherit; }
   </style>
 </head>
 <body>
   <p id="status" class="disconnected"><span class="dot"></span>Waiting for master…</p>
+  <button id="propose-btn">Propose URL</button>
+  <form id="propose-form">
+    <input id="propose-url" type="url" placeholder="https://…">
+    <button id="propose-submit" type="submit">Send</button>
+  </form>
   <script>
     (function () {
       var wsURL = 'ws://' + location.host + '?role=client';
       var lastRatio = -1;
+      var ws = null;
+
       function connect() {
-        var ws = new WebSocket(wsURL);
+        ws = new WebSocket(wsURL);
         var status = document.getElementById('status');
         ws.onopen = function () {
           if (status) { status.className = 'connected'; status.innerHTML = '<span class="dot"></span>Connected'; }
@@ -46,6 +59,8 @@
               if ((down && m.ratio > clientRatio) || (!down && m.ratio < clientRatio))
                 window.scrollTo(0, m.ratio * document.documentElement.scrollHeight);
             }
+          } else if (m.type === 'navigate') {
+            window.location.href = m.url;
           }
         };
         ws.onclose = function () {
@@ -54,6 +69,28 @@
         };
       }
       connect();
+
+      // Propose button — lets clients suggest a URL to the master
+      var proposeBtn = document.getElementById('propose-btn');
+      var proposeForm = document.getElementById('propose-form');
+      var proposeUrl = document.getElementById('propose-url');
+
+      proposeBtn.addEventListener('click', function () {
+        var open = proposeForm.style.display === 'flex';
+        proposeForm.style.display = open ? 'none' : 'flex';
+        if (!open) proposeUrl.focus();
+      });
+
+      proposeForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var url = proposeUrl.value.trim();
+        if (!url) return;
+        if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify({ type: 'propose', url: url }));
+        proposeUrl.value = '';
+        proposeForm.style.display = 'none';
+        proposeBtn.textContent = 'Proposed!';
+        setTimeout(function () { proposeBtn.textContent = 'Propose URL'; }, 2000);
+      });
     })();
   </script>
 </body>
