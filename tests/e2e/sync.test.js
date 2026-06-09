@@ -452,6 +452,38 @@ test('master view close button dismisses the overlay', async ({ browser }) => {
   await ctx.close();
 });
 
+test('master view hides original page content and restores it on close', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  const page = await ctx.newPage();
+  await page.goto(BASE);
+  await page.setContent(`<html><body style="margin:0"><div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Visibility test</p></div></body></html>`);
+
+  const clientScript = buildClientScript(WS);
+  const code = buildBookmarkletSource(WS, clientScript);
+
+  await page.evaluate(code);
+  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  const box = await page.locator('#lyrics').boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
+
+  // Body must be hidden to prevent original page showing through elastic overscroll
+  const bodyVisibility = await page.evaluate(() => document.body.style.visibility);
+  expect(bodyVisibility).toBe('hidden');
+
+  // iframe and close button must remain visible despite body being hidden
+  await expect(page.locator('iframe#__circleSyncView')).toBeVisible();
+  await expect(page.locator('#__circleSyncCloseBtn')).toBeVisible();
+
+  // Closing must restore body visibility
+  await page.locator('#__circleSyncCloseBtn').click();
+  await expect(page.locator('iframe#__circleSyncView')).not.toBeAttached({ timeout: 3000 });
+  const bodyVisibilityAfter = await page.evaluate(() => document.body.style.visibility);
+  expect(bodyVisibilityAfter).toBe('');
+
+  await ctx.close();
+});
+
 // ─── Bookmarklet re-tap cleanup ────────────────────────────────────────────────
 
 test('re-tapping bookmarklet cleans up previous WS and pick mode', async ({ browser }) => {
