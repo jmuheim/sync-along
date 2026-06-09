@@ -263,6 +263,182 @@ test('selector memory: second bookmarklet tap on same domain shows saved-element
   await ctx.close();
 });
 
+// ─── Scroll direction logic ────────────────────────────────────────────────────
+
+test('scroll direction logic: client follows master when behind/above, stays put when already ahead/above', async ({ browser }) => {
+  const clientScript = buildClientScript(WS);
+  const tallPageHTML = `<!DOCTYPE html><html><head></head><body style="height:5000px"><p id="anchor">top</p><script>${clientScript}<\/script></body></html>`;
+
+  const masterPage = await browser.newPage();
+  const clientPage = await browser.newPage();
+
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  // Each sendScroll opens a fresh master WS, sends one scroll message, then closes
+  const sendScroll = (ratio) => masterPage.evaluate(
+    async ({ wsURL, ratio }) => {
+      await new Promise((resolve, reject) => {
+        const ws = new WebSocket(`${wsURL}?role=master`);
+        ws.onopen = () => { ws.send(JSON.stringify({ type: 'scroll', ratio })); ws.close(); resolve(); };
+        ws.onerror = reject;
+      });
+    },
+    { wsURL: WS, ratio },
+  );
+
+  // Push the tall page (this replaces client.html; injected script reconnects with lastRatio = -1)
+  await masterPage.evaluate(async ({ wsURL, html }) => {
+    await new Promise((resolve, reject) => {
+      const ws = new WebSocket(`${wsURL}?role=master`);
+      ws.onopen = () => { ws.send(JSON.stringify({ type: 'page', html })); ws.close(); resolve(); };
+      ws.onerror = reject;
+    });
+  }, { wsURL: WS, html: tallPageHTML });
+  await expect(clientPage.locator('#anchor')).toBeVisible({ timeout: 5000 });
+
+  // ── Scenario 1: client is behind master scrolling down → follows ──────────────
+  // lastRatio=-1, send 0.8 → down=true, clientRatio=0 → 0.8 > 0 → scrolls
+  await sendScroll(0.8);
+  await expect(async () => {
+    expect(await clientPage.evaluate(() => window.scrollY)).toBeGreaterThan(3500);
+  }).toPass({ timeout: 5000 });
+
+  // ── Scenario 2: client ahead of master scrolling down → stays put ─────────────
+  // lastRatio=0.8, pull client back up to 10% via scroll message, then push ahead manually
+  await sendScroll(0.1); // client moves up (going up from 0.8→0.1, clientRatio=0.8 > 0.1 → scrolls up)
+  await expect(async () => {
+    expect(await clientPage.evaluate(() => window.scrollY)).toBeLessThan(800);
+  }).toPass({ timeout: 5000 });
+
+  await clientPage.evaluate(() => window.scrollTo(0, 4000)); // manually push client to 80%
+  await clientPage.waitForTimeout(150);
+
+  // lastRatio=0.1, send 0.5 (going down) — client is at 0.8, ahead of master's 0.5 → no scroll
+  await sendScroll(0.5);
+  await clientPage.waitForTimeout(400); // give message time to arrive
+  expect(await clientPage.evaluate(() => window.scrollY)).toBeGreaterThan(3500);
+
+  // ── Scenario 3: master scrolls up, client is below → client follows up ────────
+  // lastRatio=0.5, client at 80%, send 0.1 (going up) → !down && 0.1 < 0.8 → scrolls up
+  await sendScroll(0.1);
+  await expect(async () => {
+    expect(await clientPage.evaluate(() => window.scrollY)).toBeLessThan(800);
+  }).toPass({ timeout: 5000 });
+
+  // ── Scenario 4: master scrolls up, client already above master → stays put ─────
+  // Prime lastRatio to 0.8 (client also moves to 80%)
+  await sendScroll(0.8);
+  await expect(async () => {
+    expect(await clientPage.evaluate(() => window.scrollY)).toBeGreaterThan(3500);
+  }).toPass({ timeout: 5000 });
+
+  await clientPage.evaluate(() => window.scrollTo(0, 300)); // manually put client at ~6%
+  await clientPage.waitForTimeout(150);
+
+  // lastRatio=0.8, send 0.4 (going up) — client is at ~6%, already above 0.4 → no scroll
+  await sendScroll(0.4);
+  await clientPage.waitForTimeout(400);
+  expect(await clientPage.evaluate(() => window.scrollY)).toBeLessThan(800);
+
+  await masterPage.close();
+  await clientPage.close();
+});
+
+// ─── Selector memory buttons ───────────────────────────────────────────────────
+
+test('selector memory "Use it" shares the saved element and shows master view', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  const songPage = await ctx.newPage();
+  await songPage.goto(BASE);
+  await songPage.setContent(`<html><body style="margin:0"><div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Amazing grace saved</p></div></body></html>`);
+
+  const clientScript = buildClientScript(WS);
+  const code = buildBookmarkletSource(WS, clientScript);
+
+  // First tap: pick the element to save the selector
+  await songPage.evaluate(code);
+  await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  const box = await songPage.locator('#lyrics').boundingBox();
+  await songPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(songPage.locator('#__circleSyncView')).toBeVisible({ timeout: 5000 });
+
+  // Set up client, then re-tap to get the saved-element prompt
+  const clientPage = await browser.newPage();
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  await songPage.evaluate(() => { if (window.__circleSyncCleanup) window.__circleSyncCleanup(); });
+  await songPage.evaluate(code);
+  await expect(songPage.getByText('Use it')).toBeVisible({ timeout: 5000 });
+
+  // Click "Use it" — should share the saved element and show master view
+  await songPage.getByRole('button', { name: 'Use it' }).click();
+  await expect(songPage.locator('#__circleSyncView')).toBeVisible({ timeout: 5000 });
+  await expect(clientPage.getByText('Amazing grace saved')).toBeVisible({ timeout: 5000 });
+
+  await ctx.close();
+  await clientPage.close();
+});
+
+test('selector memory "Change?" re-enters pick mode', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  const page = await ctx.newPage();
+  await page.goto(BASE);
+  await page.setContent(`<html><body style="margin:0"><div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Change test</p></div></body></html>`);
+
+  const clientScript = buildClientScript(WS);
+  const code = buildBookmarkletSource(WS, clientScript);
+
+  // First tap: pick to save selector
+  await page.evaluate(code);
+  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  const box = await page.locator('#lyrics').boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.locator('#__circleSyncView')).toBeVisible({ timeout: 5000 });
+
+  // Re-tap to get the saved-element prompt
+  await page.evaluate(() => { if (window.__circleSyncCleanup) window.__circleSyncCleanup(); });
+  await page.evaluate(code);
+  await expect(page.getByText('Change?')).toBeVisible({ timeout: 5000 });
+
+  // Click "Change?" — prompt disappears and full pick mode starts
+  await page.getByText('Change?').click();
+  await expect(page.getByText('Change?')).not.toBeVisible({ timeout: 3000 });
+  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(page.getByText('Tap the lyrics container')).toBeVisible();
+
+  await ctx.close();
+});
+
+// ─── Master view close button ──────────────────────────────────────────────────
+
+test('master view close button dismisses the overlay', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  const page = await ctx.newPage();
+  await page.goto(BASE);
+  await page.setContent(`<html><body style="margin:0"><div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Close test</p></div></body></html>`);
+
+  const clientScript = buildClientScript(WS);
+  const code = buildBookmarkletSource(WS, clientScript);
+
+  await page.evaluate(code);
+  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  const box = await page.locator('#lyrics').boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.locator('#__circleSyncView')).toBeVisible({ timeout: 5000 });
+
+  // Close button must be visible alongside the master view
+  await expect(page.locator('#__circleSyncCloseBtn')).toBeVisible();
+
+  await page.locator('#__circleSyncCloseBtn').click();
+
+  await expect(page.locator('#__circleSyncView')).not.toBeAttached({ timeout: 3000 });
+  await expect(page.locator('#__circleSyncCloseBtn')).not.toBeAttached();
+
+  await ctx.close();
+});
+
 // ─── Bookmarklet re-tap cleanup ────────────────────────────────────────────────
 
 test('re-tapping bookmarklet cleans up previous WS and pick mode', async ({ browser }) => {
