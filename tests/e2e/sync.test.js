@@ -113,11 +113,11 @@ test('master scroll message moves client scroll position', async ({ browser }) =
   await clientPage.close();
 });
 
-// ─── Client reconnect after document.write ─────────────────────────────────────
+// ─── Client reconnect after document.write + scroll resets on new page ─────────
 
-test('client re-establishes WebSocket after document.write replaces the page', async ({ browser }) => {
+test('client re-establishes WebSocket after document.write and scroll resets correctly on second page', async ({ browser }) => {
   const clientScript = buildClientScript(WS);
-  const replacementHTML = `<!DOCTYPE html><html><head></head><body><p id="replaced">replaced</p><script>${clientScript}<\/script></body></html>`;
+  const tallPage = (id) => `<!DOCTYPE html><html><head></head><body style="height:5000px"><p id="${id}">anchor</p><script>${clientScript}<\/script></body></html>`;
 
   const masterPage = await browser.newPage();
   const clientPage = await browser.newPage();
@@ -125,30 +125,41 @@ test('client re-establishes WebSocket after document.write replaces the page', a
   await clientPage.goto(`${BASE}/client.html`);
   await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
 
-  // First page replacement
-  await masterPage.evaluate(async ({ wsURL, html }) => {
+  const sendMaster = (msgs) => masterPage.evaluate(async ({ wsURL, msgs }) => {
     await new Promise((resolve, reject) => {
       const ws = new WebSocket(`${wsURL}?role=master`);
-      ws.onopen = () => { ws.send(JSON.stringify({ type: 'page', html })); ws.close(); resolve(); };
+      ws.onopen = async () => {
+        for (const m of msgs) { ws.send(JSON.stringify(m)); await new Promise(r => setTimeout(r, 150)); }
+        ws.close(); resolve();
+      };
       ws.onerror = reject;
     });
-  }, { wsURL: WS, html: replacementHTML });
+  }, { wsURL: WS, msgs });
 
-  await expect(clientPage.locator('#replaced')).toBeVisible({ timeout: 5000 });
+  // Page 1: push content and scroll master to 80%
+  await sendMaster([
+    { type: 'page', html: tallPage('page1') },
+    { type: 'scroll', ratio: 0.8 },
+  ]);
+  await expect(clientPage.locator('#page1')).toBeVisible({ timeout: 5000 });
+  await expect(async () => {
+    expect(await clientPage.evaluate(() => window.scrollY)).toBeGreaterThan(3500);
+  }).toPass({ timeout: 5000 });
 
-  // After document.write the injected client script should have reconnected.
-  // Send a second page message to confirm the client is still listening.
-  const secondHTML = `<!DOCTYPE html><html><head></head><body><p id="second-replaced">second</p><script>${clientScript}<\/script></body></html>`;
-
-  await masterPage.evaluate(async ({ wsURL, html }) => {
-    await new Promise((resolve, reject) => {
-      const ws = new WebSocket(`${wsURL}?role=master`);
-      ws.onopen = () => { ws.send(JSON.stringify({ type: 'page', html })); ws.close(); resolve(); };
-      ws.onerror = reject;
-    });
-  }, { wsURL: WS, html: secondHTML });
-
-  await expect(clientPage.locator('#second-replaced')).toBeVisible({ timeout: 8000 });
+  // Page 2: share a second page and scroll from the top.
+  // lastRatio on the surviving WS is 0.8; without the fix the direction logic
+  // would read the first scroll (0.3) as "going up" and skip it.
+  await sendMaster([
+    { type: 'page', html: tallPage('page2') },
+    { type: 'scroll', ratio: 0.3 },
+  ]);
+  await expect(clientPage.locator('#page2')).toBeVisible({ timeout: 5000 });
+  // Client must scroll to ~30% — not stuck at 80% or stranded at 0%
+  await expect(async () => {
+    const y = await clientPage.evaluate(() => window.scrollY);
+    expect(y).toBeGreaterThan(1000);
+    expect(y).toBeLessThan(2500);
+  }).toPass({ timeout: 5000 });
 
   await masterPage.close();
   await clientPage.close();

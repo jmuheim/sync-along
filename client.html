@@ -27,9 +27,17 @@
         ws.onmessage = function (e) {
           var m = JSON.parse(e.data);
           if (m.type === 'page') {
+            // Reset scroll state so the new page always starts from a clean baseline.
+            // lastRatio must be -1 because the injected script's WS survives document.write
+            // (window.__circleSyncClient stays set), so its stale ratio from the previous
+            // page would otherwise corrupt the direction logic on the first scroll message.
+            lastRatio = -1;
             document.open();
             document.write(m.html);
             document.close();
+            // Explicit scroll-to-top in case the browser preserves scroll position
+            // across document.write (not guaranteed by the spec).
+            window.scrollTo(0, 0);
           } else if (m.type === 'scroll') {
             if (m.ratio !== lastRatio) {
               var down = m.ratio > lastRatio;
