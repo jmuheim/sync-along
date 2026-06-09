@@ -46,7 +46,7 @@ export function createServer() {
       ws.on('message', (data) => {
         let msg;
         try { msg = JSON.parse(data); } catch { return; }
-        if (msg.type === 'page' || msg.type === 'scroll') {
+        if (msg.type === 'page' || msg.type === 'scroll' || msg.type === 'navigate') {
           for (const client of clients) {
             if (client.readyState === client.OPEN) {
               client.send(data.toString());
@@ -58,6 +58,14 @@ export function createServer() {
       ws.on('close', () => { if (master === ws) master = null; });
     } else {
       clients.add(ws);
+      ws.on('message', (data) => {
+        let msg;
+        try { msg = JSON.parse(data); } catch { return; }
+        // Forward URL proposals from any client up to the master
+        if (msg.type === 'propose' && master?.readyState === master?.OPEN) {
+          master.send(data.toString());
+        }
+      });
       ws.on('close', () => clients.delete(ws));
     }
   });

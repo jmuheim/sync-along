@@ -452,6 +452,231 @@ test('master view close button dismisses the overlay', async ({ browser }) => {
   await ctx.close();
 });
 
+// ─── URL proposal flow ─────────────────────────────────────────────────────────
+
+test('client proposes URL; master dismisses then approves; approved URL navigates clients', async ({ browser }) => {
+  const clientScript = buildClientScript(WS);
+  const bookmarkletCode = buildBookmarkletSource(WS, clientScript);
+
+  // Set up a "song page" for the master bookmarklet
+  const songCtx = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  const songPage = await songCtx.newPage();
+  await songPage.goto(BASE);
+  await songPage.setContent(`<html><body style="margin:0"><div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Song</p></div></body></html>`);
+  await songPage.evaluate(bookmarkletCode);
+  await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+
+  // Two clients connect
+  const clientA = await browser.newPage();
+  const clientB = await browser.newPage();
+  await clientA.goto(`${BASE}/client.html`);
+  await clientB.goto(`${BASE}/client.html`);
+  await expect(clientA.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+  await expect(clientB.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  // ── Propose button visible and toggles the URL form ──────────────────────────
+  await expect(clientA.locator('#propose-btn')).toBeVisible();
+  await clientA.locator('#propose-btn').click();
+  await expect(clientA.locator('#propose-form')).toBeVisible();
+
+  // ── First proposal: master dismisses ─────────────────────────────────────────
+  await clientA.locator('#propose-url').fill('https://example.com/song1');
+  await clientA.locator('#propose-submit').click();
+
+  await expect(songPage.locator('.__circleSyncProposal')).toBeVisible({ timeout: 5000 });
+  await expect(songPage.getByText('https://example.com/song1')).toBeVisible();
+  await songPage.getByText('Dismiss').click();
+  await expect(songPage.locator('.__circleSyncProposal')).not.toBeAttached({ timeout: 3000 });
+
+  // Clients must NOT have navigated
+  expect(clientA.url()).toMatch(/\/client\.html$/);
+  expect(clientB.url()).toMatch(/\/client\.html$/);
+
+  // ── Second proposal: master approves → clients navigate ───────────────────────
+  await clientA.locator('#propose-btn').click();
+  await clientA.locator('#propose-url').fill('https://example.com/song2');
+  await clientA.locator('#propose-submit').click();
+
+  await expect(songPage.locator('.__circleSyncProposal')).toBeVisible({ timeout: 5000 });
+  await songPage.getByText('Share with clients').click();
+
+  // Both clients should navigate to the proposed URL
+  await expect(async () => {
+    expect(clientA.url()).toContain('example.com/song2');
+  }).toPass({ timeout: 5000 });
+  await expect(async () => {
+    expect(clientB.url()).toContain('example.com/song2');
+  }).toPass({ timeout: 5000 });
+
+  await songCtx.close();
+  await clientA.close();
+  await clientB.close();
+});
+
+test('propose button appears on synced pages (injected by client script)', async ({ browser }) => {
+  const clientScript = buildClientScript(WS);
+  const pageHTML = `<!DOCTYPE html><html><head></head><body><p id="content">Lyrics here</p><script>${clientScript}<\/script></body></html>`;
+
+  const masterPage = await browser.newPage();
+  const clientPage = await browser.newPage();
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  await masterPage.evaluate(async ({ wsURL, html }) => {
+    await new Promise((resolve, reject) => {
+      const ws = new WebSocket(`${wsURL}?role=master`);
+      ws.onopen = () => { ws.send(JSON.stringify({ type: 'page', html })); ws.close(); resolve(); };
+      ws.onerror = reject;
+    });
+  }, { wsURL: WS, html: pageHTML });
+
+  await expect(clientPage.locator('#content')).toBeVisible({ timeout: 5000 });
+  // Injected client script must have added the propose button
+  await expect(clientPage.locator('#__csp')).toBeVisible({ timeout: 3000 });
+
+  await masterPage.close();
+  await clientPage.close();
+});
+
+// ─── Master view iframe scroll → clients ──────────────────────────────────────
+
+test('scrolling inside master view iframe propagates scroll position to clients', async ({ browser }) => {
+  const clientScript = buildClientScript(WS);
+  const bookmarkletCode = buildBookmarkletSource(WS, clientScript);
+
+  const songCtx = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  const songPage = await songCtx.newPage();
+  await songPage.goto(BASE);
+  // Tall element with no children, so elementFromPoint at y+10 returns the div itself
+  // (not a child paragraph) and sendPage sends the full 5000px element.
+  await songPage.setContent(`
+    <html><body style="margin:0">
+      <div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:5000px;background:#eee"></div>
+    </body></html>
+  `);
+  await songPage.evaluate(bookmarkletCode);
+  await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+
+  const clientPage = await browser.newPage();
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  // Click near the top of the element so the coordinates stay within the 600px viewport.
+  // (center would be y=2500 — outside viewport — causing elementFromPoint to return null.)
+  const box = await songPage.locator('#lyrics').boundingBox();
+  await songPage.mouse.click(box.x + box.width / 2, box.y + 10);
+  await expect(songPage.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
+
+  // Scroll inside the master view iframe; sendScroll() reads contentWindow.scrollY
+  // and broadcasts the ratio every 200 ms. Retry to handle the srcdoc load race.
+  await expect(async () => {
+    await songPage.evaluate(() => {
+      const iframe = document.getElementById('__circleSyncView');
+      iframe.contentWindow.scrollTo(0, 4000);
+    });
+    const y = await clientPage.evaluate(() => window.scrollY);
+    expect(y).toBeGreaterThan(1000);
+  }).toPass({ timeout: 8000 });
+
+  await songCtx.close();
+  await clientPage.close();
+});
+
+// ─── Injected propose button on synced pages ───────────────────────────────────
+
+test('injected +URL button on synced pages sends URL proposal to master', async ({ browser }) => {
+  const clientScript = buildClientScript(WS);
+  // Include clientScript in the page so injectUI() runs after document.write
+  const pageHTML = `<!DOCTYPE html><html><head></head><body><p id="song-content">Lyrics</p><script>${clientScript}<\/script></body></html>`;
+
+  const masterPage = await browser.newPage();
+  const clientPage = await browser.newPage();
+
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  // Open a persistent master WS that will later receive the propose message
+  await masterPage.evaluate(async ({ wsURL, html }) => {
+    window.__testMasterWS = new WebSocket(`${wsURL}?role=master`);
+    await new Promise((resolve, reject) => {
+      window.__testMasterWS.onopen = () => {
+        window.__testMasterWS.send(JSON.stringify({ type: 'page', html }));
+        resolve();
+      };
+      window.__testMasterWS.onerror = reject;
+    });
+    // Keep the WS open — don't close it so it can receive propose messages
+  }, { wsURL: WS, html: pageHTML });
+
+  // Client receives the page; the injected clientScript calls injectUI() which adds #__csp
+  await expect(clientPage.locator('#song-content')).toBeVisible({ timeout: 5000 });
+  await expect(clientPage.locator('#__csp')).toBeVisible({ timeout: 5000 });
+
+  // Arm the propose listener on master BEFORE clicking so we don't miss the event
+  await masterPage.evaluate(() => {
+    window.__receivedProposal = null;
+    window.__testMasterWS.onmessage = (e) => {
+      const m = JSON.parse(e.data);
+      if (m.type === 'propose') window.__receivedProposal = m.url;
+    };
+  });
+
+  // Use the injected propose button
+  await clientPage.locator('#__csp').click();
+  await clientPage.locator('input[placeholder="https://..."]').fill('https://example.com/from-synced-page');
+  await clientPage.getByRole('button', { name: 'Propose' }).click();
+
+  // Server forwards the propose to master; master's WS onmessage should fire
+  await expect(async () => {
+    const url = await masterPage.evaluate(() => window.__receivedProposal);
+    expect(url).toBe('https://example.com/from-synced-page');
+  }).toPass({ timeout: 5000 });
+
+  await masterPage.close();
+  await clientPage.close();
+});
+
+// ─── Navigate after page replacement ──────────────────────────────────────────
+
+test('navigate message is handled by surviving WS after document.write replaces the page', async ({ browser }) => {
+  const clientScript = buildClientScript(WS);
+  const pageHTML = `<!DOCTYPE html><html><head></head><body><p id="synced">Synced page</p><script>${clientScript}<\/script></body></html>`;
+
+  const masterPage = await browser.newPage();
+  const clientPage = await browser.newPage();
+
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  // Replace client.html with a synced page via document.write
+  await masterPage.evaluate(async ({ wsURL, html }) => {
+    await new Promise((resolve, reject) => {
+      const ws = new WebSocket(`${wsURL}?role=master`);
+      ws.onopen = () => { ws.send(JSON.stringify({ type: 'page', html })); ws.close(); resolve(); };
+      ws.onerror = reject;
+    });
+  }, { wsURL: WS, html: pageHTML });
+  await expect(clientPage.locator('#synced')).toBeVisible({ timeout: 5000 });
+
+  // Now send a navigate message — the original WS (protected by __circleSyncClient)
+  // must still handle it even though the page DOM was replaced
+  await masterPage.evaluate(async ({ wsURL }) => {
+    await new Promise((resolve, reject) => {
+      const ws = new WebSocket(`${wsURL}?role=master`);
+      ws.onopen = () => { ws.send(JSON.stringify({ type: 'navigate', url: 'https://example.com/after-replace' })); ws.close(); resolve(); };
+      ws.onerror = reject;
+    });
+  }, { wsURL: WS });
+
+  await expect(async () => {
+    expect(clientPage.url()).toContain('example.com/after-replace');
+  }).toPass({ timeout: 5000 });
+
+  await masterPage.close();
+  // clientPage navigated away; just close it
+  await clientPage.close().catch(() => {});
+});
+
 // ─── Bookmarklet re-tap cleanup ────────────────────────────────────────────────
 
 test('re-tapping bookmarklet cleans up previous WS and pick mode', async ({ browser }) => {
