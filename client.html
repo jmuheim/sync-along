@@ -42,9 +42,10 @@
             if (m.ratio !== lastRatio) {
               var down = m.ratio > lastRatio;
               lastRatio = m.ratio;
-              var clientRatio = window.scrollY / Math.max(1, document.documentElement.scrollHeight);
+              var scrollable = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+              var clientRatio = window.scrollY / scrollable;
               if ((down && m.ratio > clientRatio) || (!down && m.ratio < clientRatio))
-                window.scrollTo(0, m.ratio * document.documentElement.scrollHeight);
+                window.scrollTo(0, m.ratio * scrollable);
             }
           }
         };
