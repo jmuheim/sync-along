@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voltage – ZYLA | PopPlex (demo)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;700&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --hot: #ff0080;
+      --electric: #00e5ff;
+      --lime: #b8ff00;
+      --dark: #0a0a0f;
+    }
+    body { font-family: 'Space Grotesk', system-ui, sans-serif; background: var(--dark); color: #fff; }
+    header { padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1a1a2e; }
+    .logo { font-size: 1.1rem; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; }
+    .logo span { color: var(--hot); }
+    header nav a { color: #555; text-decoration: none; margin-left: 1.5rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+    .song-banner { position: relative; overflow: hidden; padding: 4rem 2rem 3rem; text-align: center; }
+    .song-banner::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 30% 50%, #ff008033, transparent 60%), radial-gradient(ellipse at 70% 50%, #00e5ff22, transparent 60%); }
+    .song-banner .pre { font-size: 0.7rem; letter-spacing: 4px; text-transform: uppercase; color: var(--electric); margin-bottom: 0.75rem; position: relative; }
+    .song-banner h1 { font-size: 4rem; font-weight: 700; position: relative; background: linear-gradient(90deg, var(--hot), var(--electric)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; }
+    .song-banner .artist { position: relative; margin-top: 0.75rem; font-size: 1.1rem; color: #aaa; letter-spacing: 2px; }
+    .song-banner .genre-pills { position: relative; margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
+    .genre-pills span { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; padding: 0.25rem 0.75rem; border-radius: 99px; border: 1px solid; }
+    .genre-pills .g1 { border-color: var(--hot); color: var(--hot); }
+    .genre-pills .g2 { border-color: var(--electric); color: var(--electric); }
+    .genre-pills .g3 { border-color: var(--lime); color: var(--lime); }
+    .lyrics-wrap { max-width: 680px; margin: 0 auto; padding: 3rem 2rem; }
+    .block { margin-bottom: 3rem; }
+    .block-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 1rem; font-weight: 700; }
+    .block-label.hot { color: var(--hot); }
+    .block-label.electric { color: var(--electric); }
+    .block-label.lime { color: var(--lime); }
+    .line { font-size: 1.1rem; line-height: 2.1; font-weight: 300; color: #ddd; }
+    .chorus-block { border: 1px solid var(--hot); border-radius: 12px; padding: 1.5rem 2rem; background: rgba(255,0,128,0.05); }
+    .chorus-block .line { font-weight: 700; font-size: 1.2rem; color: #fff; }
+    .bridge-block { border: 1px solid var(--electric); border-radius: 12px; padding: 1.5rem 2rem; background: rgba(0,229,255,0.05); }
+    footer { text-align: center; padding: 2rem; font-size: 0.7rem; color: #333; border-top: 1px solid #111; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="logo">Pop<span>Plex</span></span>
+    <nav><a href="#">Charts</a><a href="#">New</a><a href="#">Artists</a></nav>
+  </header>
+  <div class="song-banner">
+    <div class="pre">Now playing</div>
+    <h1>VOLTAGE</h1>
+    <div class="artist">Z Y L A</div>
+    <div class="genre-pills">
+      <span class="g1">synth-pop</span>
+      <span class="g2">electro</span>
+      <span class="g3">dance</span>
+    </div>
+  </div>
+  <div class="lyrics-wrap" id="lyrics-wrap">
+    <div class="block">
+      <div class="block-label electric">Verse 1</div>
+      <div class="line">Static in the elevator, eyes don't meet</div>
+      <div class="line">Fingertips on glass, searching for a beat</div>
+      <div class="line">Seventeen floors of nothing to say</div>
+      <div class="line">The doors slide open, you walk away</div>
+    </div>
+    <div class="block chorus-block">
+      <div class="block-label hot">Chorus</div>
+      <div class="line">Voltage, voltage, you're a live wire</div>
+      <div class="line">Burning up the circuit, taking it higher</div>
+      <div class="line">Voltage, voltage, can't insulate</div>
+      <div class="line">Everything you touch just overloads straight</div>
+    </div>
+    <div class="block">
+      <div class="block-label electric">Verse 2</div>
+      <div class="line">You rewrite the frequency, mess with the phase</div>
+      <div class="line">I'm trying to ground out but I'm lost in the haze</div>
+      <div class="line">Every time you call my name the signal spikes red</div>
+      <div class="line">You're a storm in a server room inside my head</div>
+    </div>
+    <div class="block chorus-block">
+      <div class="block-label hot">Chorus</div>
+      <div class="line">Voltage, voltage, you're a live wire</div>
+      <div class="line">Burning up the circuit, taking it higher</div>
+      <div class="line">Voltage, voltage, can't insulate</div>
+      <div class="line">Everything you touch just overloads straight</div>
+    </div>
+    <div class="block bridge-block">
+      <div class="block-label electric">Bridge</div>
+      <div class="line">Cut the power (cut the power)</div>
+      <div class="line">Blow the fuse (blow the fuse)</div>
+      <div class="line">I'd rather be overloaded</div>
+      <div class="line">Than have nothing left to lose</div>
+    </div>
+    <div class="block chorus-block">
+      <div class="block-label lime">Outro Chorus</div>
+      <div class="line">Voltage, voltage — live wire, live wire</div>
+      <div class="line">Voltage, voltage — live wire, live wire</div>
+      <div class="line">Voltage, voltage, can't insulate</div>
+      <div class="line">Everything you touch just overloads — straight</div>
+    </div>
+  </div>
+  <footer>© 2024 PopPlex (demo page for Sync Along development)</footer>
+</body>
+</html>

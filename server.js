@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { getLocalIP } from './lib/network.js';
-import { buildIndexHTML } from './lib/ui.js';
+import { buildIndexHTML, buildDevHTML } from './lib/ui.js';
 import { buildBookmarkletCode } from './lib/bookmarklet.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -56,20 +56,6 @@ export function createServer() {
       return;
     }
 
-    {
-      const demoMatch = req.url.match(/^\/demo(?:\/([a-z0-9-]+))?$/);
-      if (demoMatch) {
-        const name = demoMatch[1] || 'echords';
-        const filePath = path.join(__dirname, 'demos', `${name}.html`);
-        if (fs.existsSync(filePath)) {
-          const html = fs.readFileSync(filePath, 'utf8');
-          res.writeHead(200, { 'Content-Type': 'text/html' });
-          serve(res, html);
-          return;
-        }
-      }
-    }
-
     if (LIVE_RELOAD && req.url === '/livereload') {
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -79,6 +65,31 @@ export function createServer() {
       res.write('retry: 500\ndata: connected\n\n');
       reloadClients.add(res);
       req.on('close', () => reloadClients.delete(res));
+      return;
+    }
+
+    if (req.url === '/dev') {
+      const ip = getLocalIP();
+      const demoPagesDir = path.join(__dirname, 'demos');
+      let demoPages = [];
+      try { demoPages = fs.readdirSync(demoPagesDir).filter(f => f.endsWith('.html')).sort(); } catch {}
+      const html = buildDevHTML(ip, PORT, demoPages);
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(html);
+      return;
+    }
+
+    const demoMatch = req.url.match(/^\/demos\/([^/?#]+\.html)$/);
+    if (demoMatch) {
+      const filePath = path.join(__dirname, 'demos', demoMatch[1]);
+      try {
+        const html = fs.readFileSync(filePath, 'utf8');
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(html);
+      } catch {
+        res.writeHead(404);
+        res.end('Not found');
+      }
       return;
     }
 

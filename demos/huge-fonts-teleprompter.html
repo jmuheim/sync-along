@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fire on the Water – ReadItLoud (demo)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #111; color: #f0f0f0; }
+    header { background: #000; padding: 0.75rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #333; }
+    .logo { font-size: 1rem; font-weight: 700; color: #fff; letter-spacing: 2px; text-transform: uppercase; }
+    .font-hint { font-size: 0.75rem; color: #555; }
+    .song-header { padding: 2rem 2rem 1rem; border-bottom: 1px solid #222; }
+    .song-header h1 { font-size: 2rem; font-weight: 900; color: #fff; }
+    .song-header .artist { font-size: 1rem; color: #888; margin-top: 0.25rem; }
+    .lyrics { padding: 2rem; max-width: 900px; }
+    .section-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 3px; color: #555; margin: 2.5rem 0 1rem; font-weight: 700; }
+    .section-label:first-child { margin-top: 0; }
+    .lyric-line { font-size: 3.5rem; font-weight: 800; line-height: 1.25; color: #f0f0f0; margin-bottom: 0.1rem; }
+    .lyric-line.secondary { color: #888; font-weight: 400; }
+    .chorus-block { background: #1a1a1a; border-left: 6px solid #e94560; padding: 1.5rem 2rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+    .chorus-block .lyric-line { color: #fff; }
+    footer { padding: 2rem; font-size: 0.7rem; color: #333; border-top: 1px solid #1a1a1a; margin-top: 3rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="logo">ReadItLoud</span>
+    <span class="font-hint">Teleprompter mode</span>
+  </header>
+  <div class="song-header">
+    <h1>Fire on the Water</h1>
+    <div class="artist">The Embers — key of E</div>
+  </div>
+  <div class="lyrics" id="lyrics">
+    <div class="section-label">Verse 1</div>
+    <div class="lyric-line">There's a fire on the water</div>
+    <div class="lyric-line">And it burns like it knows my name</div>
+    <div class="lyric-line">I've been standing on this shoreline</div>
+    <div class="lyric-line">Since before the morning came</div>
+
+    <div class="section-label">Chorus</div>
+    <div class="chorus-block">
+      <div class="lyric-line">Come on, come on</div>
+      <div class="lyric-line">Let the fire take the cold</div>
+      <div class="lyric-line">Come on, come on</div>
+      <div class="lyric-line">We were made for more than cold</div>
+    </div>
+
+    <div class="section-label">Verse 2</div>
+    <div class="lyric-line">Every ember finds the darkness</div>
+    <div class="lyric-line">Every darkness finds the dawn</div>
+    <div class="lyric-line">I have waited for this moment</div>
+    <div class="lyric-line secondary">(waited, waited)</div>
+    <div class="lyric-line">All the years that I've been gone</div>
+
+    <div class="section-label">Chorus</div>
+    <div class="chorus-block">
+      <div class="lyric-line">Come on, come on</div>
+      <div class="lyric-line">Let the fire take the cold</div>
+      <div class="lyric-line">Come on, come on</div>
+      <div class="lyric-line">We were made for more than cold</div>
+    </div>
+
+    <div class="section-label">Bridge</div>
+    <div class="lyric-line">Burn it down to nothing</div>
+    <div class="lyric-line">Build it back again</div>
+    <div class="lyric-line secondary">(build it back)</div>
+    <div class="lyric-line">That's the only way</div>
+    <div class="lyric-line">I know how to begin</div>
+
+    <div class="section-label">Outro</div>
+    <div class="lyric-line">Fire on the water</div>
+    <div class="lyric-line secondary">(fire on the water)</div>
+    <div class="lyric-line">Fire on the water</div>
+    <div class="lyric-line secondary">(let it burn)</div>
+  </div>
+  <footer>ReadItLoud · © 2024 · Demo page for Sync Along development</footer>
+</body>
+</html>

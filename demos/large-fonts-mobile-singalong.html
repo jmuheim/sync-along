@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Round the Table – Various | SingAlong (demo)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #1c2b1c; color: #e8f0e8; min-height: 100vh; }
+    header { background: #2a3d2a; padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #5a8f3c; }
+    .logo { font-size: 1.2rem; font-weight: 800; color: #8bc34a; letter-spacing: -0.5px; }
+    .logo em { color: #cddc39; font-style: normal; }
+    .key-badge { background: #5a8f3c; color: white; font-size: 0.75rem; padding: 0.3rem 0.75rem; border-radius: 99px; font-weight: 600; }
+    .song-title-bar { background: #2a3d2a; padding: 1.5rem; text-align: center; border-bottom: 1px solid #3a4f3a; }
+    .song-title-bar h1 { font-size: 1.8rem; font-weight: 800; color: #cddc39; line-height: 1.1; }
+    .song-title-bar p { font-size: 0.85rem; color: #7a9f6a; margin-top: 0.3rem; }
+    .tempo-bar { background: #3a4f3a; display: flex; justify-content: center; gap: 2rem; padding: 0.6rem; font-size: 0.75rem; color: #7a9f6a; border-bottom: 1px solid #4a6040; }
+    .tempo-bar span strong { color: #8bc34a; }
+    .lyrics-screen { padding: 2rem 1.5rem; max-width: 500px; margin: 0 auto; }
+    .block { margin-bottom: 3rem; }
+    .block-tag { display: inline-block; background: #3a4f3a; color: #8bc34a; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 2px; padding: 0.2rem 0.6rem; border-radius: 4px; margin-bottom: 1rem; font-weight: 700; }
+    .lyric-line { font-size: 2rem; font-weight: 700; line-height: 1.4; color: #e8f0e8; margin-bottom: 0.15rem; }
+    .lyric-line.dim { color: #5a7a5a; font-weight: 400; }
+    .chorus-block { background: #2a3d2a; border: 2px solid #5a8f3c; border-radius: 12px; padding: 1.5rem; }
+    .chorus-block .lyric-line { font-size: 2.2rem; color: #cddc39; }
+    .chord-hint { display: inline-block; background: #5a8f3c; color: white; font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 3px; vertical-align: super; margin-left: 0.1rem; font-weight: 700; font-family: monospace; }
+    footer { background: #111; color: #3a4f3a; text-align: center; padding: 1rem; font-size: 0.7rem; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="logo">Sing<em>Along</em></span>
+    <span class="key-badge">Key: G</span>
+  </header>
+  <div class="song-title-bar">
+    <h1>Round the Table</h1>
+    <p>Traditional · arr. for group singing</p>
+  </div>
+  <div class="tempo-bar">
+    <span>♩ <strong>96 BPM</strong></span>
+    <span>3/4 time</span>
+    <span>Capo <strong>2</strong></span>
+  </div>
+  <div class="lyrics-screen" id="lyrics-screen">
+    <div class="block">
+      <span class="block-tag">Verse 1</span>
+      <div class="lyric-line"><span class="chord-hint">G</span>Pull up a chair and</div>
+      <div class="lyric-line">sit yourself down</div>
+      <div class="lyric-line"><span class="chord-hint">C</span>There's bread on the table and</div>
+      <div class="lyric-line">wine going round</div>
+      <div class="lyric-line"><span class="chord-hint">D</span>Leave your coat at the</div>
+      <div class="lyric-line dim">(leave your coat)</div>
+      <div class="lyric-line">door in the hall</div>
+      <div class="lyric-line"><span class="chord-hint">G</span>There's a seat at this</div>
+      <div class="lyric-line">table for all</div>
+    </div>
+
+    <div class="block chorus-block">
+      <span class="block-tag">Chorus</span>
+      <div class="lyric-line"><span class="chord-hint">G</span>Round the table</div>
+      <div class="lyric-line">round the table</div>
+      <div class="lyric-line"><span class="chord-hint">C</span>Lift your voice and</div>
+      <div class="lyric-line">sing the old words</div>
+      <div class="lyric-line"><span class="chord-hint">D</span>Round the table</div>
+      <div class="lyric-line">round the table</div>
+      <div class="lyric-line"><span class="chord-hint">G</span>Nobody eats alone</div>
+      <div class="lyric-line dim">(nobody alone)</div>
+    </div>
+
+    <div class="block">
+      <span class="block-tag">Verse 2</span>
+      <div class="lyric-line"><span class="chord-hint">G</span>Bring what you have and</div>
+      <div class="lyric-line">leave what you need</div>
+      <div class="lyric-line"><span class="chord-hint">C</span>There's enough here for</div>
+      <div class="lyric-line">hunger and greed</div>
+      <div class="lyric-line"><span class="chord-hint">D</span>Stranger or neighbor</div>
+      <div class="lyric-line">it's all the same call</div>
+      <div class="lyric-line"><span class="chord-hint">G</span>There's a seat at this</div>
+      <div class="lyric-line">table for all</div>
+    </div>
+
+    <div class="block chorus-block">
+      <span class="block-tag">Chorus</span>
+      <div class="lyric-line"><span class="chord-hint">G</span>Round the table</div>
+      <div class="lyric-line">round the table</div>
+      <div class="lyric-line"><span class="chord-hint">C</span>Lift your voice and</div>
+      <div class="lyric-line">sing the old words</div>
+      <div class="lyric-line"><span class="chord-hint">D</span>Round the table</div>
+      <div class="lyric-line">round the table</div>
+      <div class="lyric-line"><span class="chord-hint">G</span>Nobody eats alone</div>
+    </div>
+  </div>
+  <footer>SingAlong · © 2024 · Demo page for Sync Along development</footer>
+</body>
+</html>
