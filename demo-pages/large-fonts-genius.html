@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Let It Be – The Beatles | Genius (demo)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,700;1,400&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #fff; color: #111; font-family: 'Lora', Georgia, serif; }
+    header { background: #ffff64; padding: 0.6rem 1.5rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #111; }
+    header .logo { font-size: 1.4rem; font-weight: 700; letter-spacing: -1px; }
+    header nav a { margin-left: 1.2rem; color: #111; text-decoration: none; font-size: 0.85rem; font-family: sans-serif; }
+    .hero { background: #111; color: #ffff64; padding: 3rem 2rem 2.5rem; }
+    .hero .meta { font-family: sans-serif; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; color: #aaa; margin-bottom: 0.5rem; }
+    .hero h1 { font-size: 3.5rem; line-height: 1.1; margin-bottom: 0.5rem; }
+    .hero .artist { font-size: 1.3rem; color: #ffff64; font-style: italic; }
+    .layout { display: flex; max-width: 1100px; margin: 0 auto; padding: 2rem; gap: 2.5rem; }
+    .lyrics-col { flex: 1; min-width: 0; }
+    .sidebar { width: 280px; flex-shrink: 0; font-family: sans-serif; }
+    .section-tag { font-family: sans-serif; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 2px; color: #888; margin: 2rem 0 0.5rem; border-top: 1px solid #eee; padding-top: 1rem; }
+    .section-tag:first-child { margin-top: 0; border-top: none; padding-top: 0; }
+    .lyric-line { font-size: 1.5rem; line-height: 1.75; color: #111; margin-bottom: 0.1rem; }
+    .lyric-line:hover { background: #ffff6440; }
+    .annotation-mark { border-bottom: 2px solid #ffcc00; cursor: pointer; }
+    .sidebar-card { background: #f5f5f5; border-radius: 6px; padding: 1rem; margin-bottom: 1rem; font-size: 0.85rem; }
+    .sidebar-card h3 { font-size: 0.9rem; margin-bottom: 0.5rem; font-family: sans-serif; }
+    footer { background: #111; color: #666; text-align: center; padding: 1.5rem; font-size: 0.75rem; font-family: sans-serif; margin-top: 3rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="logo">Genius</span>
+    <nav>
+      <a href="#">Songs</a><a href="#">Artists</a><a href="#">Albums</a><a href="#">Videos</a>
+    </nav>
+  </header>
+  <div class="hero">
+    <div class="meta">The Beatles · 1970 · Let It Be</div>
+    <h1>Let It Be</h1>
+    <div class="artist">The Beatles</div>
+  </div>
+  <div class="layout">
+    <div class="lyrics-col" id="lyrics">
+      <div class="section-tag">[Verse 1]</div>
+      <div class="lyric-line">When I find myself in times of trouble</div>
+      <div class="lyric-line"><span class="annotation-mark">Mother Mary comes to me</span></div>
+      <div class="lyric-line">Speaking words of wisdom, let it be</div>
+      <div class="lyric-line">And in my hour of darkness</div>
+      <div class="lyric-line">She is standing right in front of me</div>
+      <div class="lyric-line">Speaking words of wisdom, let it be</div>
+
+      <div class="section-tag">[Chorus]</div>
+      <div class="lyric-line">Let it be, let it be</div>
+      <div class="lyric-line">Let it be, let it be</div>
+      <div class="lyric-line">Whisper words of wisdom, let it be</div>
+
+      <div class="section-tag">[Verse 2]</div>
+      <div class="lyric-line">And when the broken-hearted people</div>
+      <div class="lyric-line">Living in the world agree</div>
+      <div class="lyric-line">There will be an answer, let it be</div>
+      <div class="lyric-line">For though they may be parted</div>
+      <div class="lyric-line">There is still a chance that they will see</div>
+      <div class="lyric-line">There will be an answer, let it be</div>
+
+      <div class="section-tag">[Chorus]</div>
+      <div class="lyric-line">Let it be, let it be</div>
+      <div class="lyric-line">Let it be, let it be</div>
+      <div class="lyric-line">There will be an answer, let it be</div>
+      <div class="lyric-line">Let it be, let it be</div>
+      <div class="lyric-line">Let it be, let it be</div>
+      <div class="lyric-line">Whisper words of wisdom, let it be</div>
+
+      <div class="section-tag">[Verse 3]</div>
+      <div class="lyric-line">And when the night is cloudy</div>
+      <div class="lyric-line">There is still a light that shines on me</div>
+      <div class="lyric-line">Shine until tomorrow, let it be</div>
+      <div class="lyric-line">I wake up to the sound of music,</div>
+      <div class="lyric-line">Mother Mary comes to me</div>
+      <div class="lyric-line">Speaking words of wisdom, let it be</div>
+
+      <div class="section-tag">[Outro]</div>
+      <div class="lyric-line">Let it be, let it be</div>
+      <div class="lyric-line">Let it be, let it be</div>
+      <div class="lyric-line">Whisper words of wisdom, let it be</div>
+    </div>
+    <aside class="sidebar">
+      <div class="sidebar-card">
+        <h3>About "Let It Be"</h3>
+        <p style="color:#555;line-height:1.5">The final single released by The Beatles. Paul McCartney wrote it after a dream about his late mother, Mary.</p>
+      </div>
+      <div class="sidebar-card">
+        <h3>More Beatles</h3>
+        <div style="line-height:2"><a href="#" style="color:#111;display:block">Hey Jude</a><a href="#" style="color:#111;display:block">Yesterday</a><a href="#" style="color:#111;display:block">Come Together</a></div>
+      </div>
+    </aside>
+  </div>
+  <footer>© 2024 Genius (demo page for Sync Along development)</footer>
+</body>
+</html>
