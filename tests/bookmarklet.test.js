@@ -171,3 +171,66 @@ describe('buildBookmarkletCode', () => {
     expect(code).toContain('ws://10.0.0.5:3000');
   });
 });
+
+describe('proportional scroll — buildClientScript', () => {
+  it('computes scrollable range as scrollHeight minus innerHeight', () => {
+    const script = buildClientScript(WS);
+    expect(script).toContain('scrollHeight-window.innerHeight');
+  });
+
+  it('divides scrollY by the scrollable range, not total scrollHeight', () => {
+    const script = buildClientScript(WS);
+    expect(script).toContain('window.scrollY/scrollable');
+  });
+
+  it('scrolls to ratio * scrollable, not ratio * scrollHeight', () => {
+    const script = buildClientScript(WS);
+    expect(script).toContain('m.ratio*scrollable');
+  });
+});
+
+describe('proportional scroll — buildBookmarkletSource sendScroll', () => {
+  it('uses viewportHeight in the denominator when computing the sent ratio', () => {
+    const source = buildBookmarkletSource(WS, buildClientScript(WS));
+    expect(source).toContain('scrollHeight-viewportHeight');
+  });
+
+  it('reads viewportHeight from the master iframe when it is open', () => {
+    const source = buildBookmarkletSource(WS, buildClientScript(WS));
+    expect(source).toContain('masterOverlay.contentWindow.innerHeight');
+  });
+});
+
+describe('band and arrow indicator', () => {
+  const source = buildBookmarkletSource(WS, buildClientScript(WS));
+
+  it('contains a left-pointing arrow character', () => {
+    expect(source).toContain('◄');
+  });
+
+  it('arrow uses a bright yellow colour', () => {
+    expect(source).toContain('#FFE600');
+  });
+
+  it('arrow has a contrasting text-shadow outline', () => {
+    expect(source).toContain('textShadow');
+  });
+
+  it('arrow is positioned on the right edge', () => {
+    expect(source).toContain("right:'0.3rem'");
+  });
+
+  it('arrow is removed when the band is removed', () => {
+    expect(source).toContain('arrowEl.remove()');
+  });
+
+  it('updateBand repositions the arrow via arrowEl.style.top', () => {
+    expect(source).toContain("arrowEl.style.top=");
+  });
+
+  it('cleanup path calls removeBand which tears down both band and arrow', () => {
+    // cleanup() calls removeBand(); that one call handles both elements
+    const cleanupSection = source.slice(source.indexOf('function cleanup('));
+    expect(cleanupSection).toContain('removeBand()');
+  });
+});

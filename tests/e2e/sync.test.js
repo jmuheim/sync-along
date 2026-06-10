@@ -192,7 +192,7 @@ test('client re-establishes WebSocket after document.write and scroll resets cor
   ]);
   await expect(clientPage.locator('#page1')).toBeVisible({ timeout: 5000 });
   await expect(async () => {
-    expect(await clientPage.evaluate(() => window.scrollY)).toBeGreaterThan(3500);
+    expect(await clientPage.evaluate(() => window.scrollY)).toBeGreaterThan(3000);
   }).toPass({ timeout: 5000 });
 
   // Page 2: share a second page and scroll from the top.
@@ -363,7 +363,7 @@ test('scroll direction logic: client follows master when behind/above, stays put
   // lastRatio=-1, send 0.8 → down=true, clientRatio=0 → 0.8 > 0 → scrolls
   await sendScroll(0.8);
   await expect(async () => {
-    expect(await clientPage.evaluate(() => window.scrollY)).toBeGreaterThan(3500);
+    expect(await clientPage.evaluate(() => window.scrollY)).toBeGreaterThan(3000);
   }).toPass({ timeout: 5000 });
 
   // ── Scenario 2: client ahead of master scrolling down → stays put ─────────────
@@ -379,7 +379,7 @@ test('scroll direction logic: client follows master when behind/above, stays put
   // lastRatio=0.1, send 0.5 (going down) — client is at 0.8, ahead of master's 0.5 → no scroll
   await sendScroll(0.5);
   await clientPage.waitForTimeout(400); // give message time to arrive
-  expect(await clientPage.evaluate(() => window.scrollY)).toBeGreaterThan(3500);
+  expect(await clientPage.evaluate(() => window.scrollY)).toBeGreaterThan(3000);
 
   // ── Scenario 3: master scrolls up, client is below → client follows up ────────
   // lastRatio=0.5, client at 80%, send 0.1 (going up) → !down && 0.1 < 0.8 → scrolls up
@@ -392,7 +392,7 @@ test('scroll direction logic: client follows master when behind/above, stays put
   // Prime lastRatio to 0.8 (client also moves to 80%)
   await sendScroll(0.8);
   await expect(async () => {
-    expect(await clientPage.evaluate(() => window.scrollY)).toBeGreaterThan(3500);
+    expect(await clientPage.evaluate(() => window.scrollY)).toBeGreaterThan(3000);
   }).toPass({ timeout: 5000 });
 
   await clientPage.evaluate(() => window.scrollTo(0, 300)); // manually put client at ~6%
@@ -555,4 +555,94 @@ test('re-tapping bookmarklet cleans up previous WS and pick mode', async ({ brow
   expect(await page.locator('#__circleSyncOverlay').count()).toBe(1);
 
   await ctx.close();
+});
+
+// ─── Arrow indicator ───────────────────────────────────────────────────────────
+
+test('arrow indicator appears when master view opens and is removed on close', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  const page = await ctx.newPage();
+  await page.goto(BASE);
+  await page.setContent(`<html><body style="margin:0"><div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Arrow test</p></div></body></html>`);
+
+  const clientScript = buildClientScript(WS);
+  const code = buildBookmarkletSource(WS, clientScript);
+  await page.evaluate(code);
+
+  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  const box = await page.locator('#lyrics').boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
+
+  // Arrow must be present with the left-pointing character
+  const arrow = page.getByText('◄');
+  await expect(arrow).toBeVisible({ timeout: 3000 });
+
+  // Closing must remove the arrow
+  await page.locator('#__circleSyncCloseBtn').click();
+  await expect(page.locator('iframe#__circleSyncView')).not.toBeAttached({ timeout: 3000 });
+  await expect(arrow).not.toBeAttached();
+
+  await ctx.close();
+});
+
+test('arrow is positioned on the right side of the viewport', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  const page = await ctx.newPage();
+  await page.goto(BASE);
+  await page.setContent(`<html><body style="margin:0"><div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Arrow position test</p></div></body></html>`);
+
+  const code = buildBookmarkletSource(WS, buildClientScript(WS));
+  await page.evaluate(code);
+  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  const box = await page.locator('#lyrics').boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
+
+  const arrowBox = await page.getByText('◄').boundingBox();
+  // Arrow's left edge must be in the right half of the 800px viewport
+  expect(arrowBox.x).toBeGreaterThan(400);
+
+  await ctx.close();
+});
+
+// ─── Proportional scroll — end-to-end ──────────────────────────────────────────
+
+test('ratio 1.0 positions client at the true scrollable bottom, not past it', async ({ browser }) => {
+  const clientScript = buildClientScript(WS);
+  const tallPageHTML = `<!DOCTYPE html><html><head></head><body style="height:5000px"><p id="anchor">top</p><script>${clientScript}<\/script></body></html>`;
+
+  const masterPage = await browser.newPage();
+  const clientPage = await browser.newPage();
+
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  await masterPage.evaluate(async ({ wsURL, html }) => {
+    await new Promise((resolve, reject) => {
+      const ws = new WebSocket(`${wsURL}?role=master`);
+      ws.onopen = async () => {
+        ws.send(JSON.stringify({ type: 'page', html }));
+        await new Promise(r => setTimeout(r, 300));
+        ws.send(JSON.stringify({ type: 'scroll', ratio: 1.0 }));
+        ws.close(); resolve();
+      };
+      ws.onerror = reject;
+    });
+  }, { wsURL: WS, html: tallPageHTML });
+
+  await expect(clientPage.locator('#anchor')).toBeVisible({ timeout: 5000 });
+
+  await expect(async () => {
+    const { scrollY, maxScroll } = await clientPage.evaluate(() => ({
+      scrollY: window.scrollY,
+      maxScroll: document.documentElement.scrollHeight - window.innerHeight,
+    }));
+    // At ratio 1.0 the client must be at the true bottom (scrollHeight - innerHeight),
+    // not at scrollHeight (which would overshoot by one viewport height).
+    expect(Math.abs(scrollY - maxScroll)).toBeLessThan(10);
+  }).toPass({ timeout: 5000 });
+
+  await masterPage.close();
+  await clientPage.close();
 });

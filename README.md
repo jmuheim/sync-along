@@ -46,3 +46,6 @@ Open the displayed URL (or scan the QR code) on each participant's device. The p
 
 - No authentication, no database, no external services — entirely local.
 
+## Todos
+
+- **Precise client viewport indicator:** Currently the master sees a gradient hint that moves with scroll position to approximate where small-screen clients are looking. A more accurate alternative: have each client send `{ type: 'viewport', width, height }` over WebSocket on connect and resize; the server relays aggregated `{ type: 'clients', minHeight }` back to the master; the master then renders an exact overlay band showing where the smallest connected client's viewport currently falls.
