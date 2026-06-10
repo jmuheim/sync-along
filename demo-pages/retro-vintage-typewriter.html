@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sawdust & Kerosene – Hank Doolin | Honky Tonk Archive (demo)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Courier Prime', 'Courier New', monospace; background: #f2e8d0; color: #2a1f0e; min-height: 100vh; }
+    .grain { position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events: none; z-index: 999; }
+    header { background: #2a1f0e; color: #c8a96e; text-align: center; padding: 1rem; border-bottom: 4px double #8b6914; }
+    header .masthead-title { font-family: 'Special Elite', cursive; font-size: 1.8rem; letter-spacing: 3px; }
+    header .masthead-sub { font-size: 0.7rem; letter-spacing: 4px; text-transform: uppercase; color: #8b6914; margin-top: 0.25rem; }
+    .rule { border: none; border-top: 2px solid #8b6914; margin: 0; }
+    .outer { max-width: 680px; margin: 0 auto; padding: 3rem 2rem; }
+    .dateline { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 2px; color: #8b6914; margin-bottom: 0.5rem; }
+    h1 { font-family: 'Special Elite', cursive; font-size: 2.4rem; line-height: 1.2; margin-bottom: 0.25rem; color: #2a1f0e; }
+    .byline { font-size: 0.8rem; color: #6b4c2a; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid #c8a96e; }
+    .verse { margin-bottom: 2rem; }
+    .verse-label { font-size: 0.7rem; letter-spacing: 2px; text-transform: uppercase; color: #8b6914; margin-bottom: 0.4rem; font-style: italic; }
+    .verse p { font-size: 1rem; line-height: 2; color: #2a1f0e; }
+    .chorus { background: #e8d8b0; border: 1px solid #c8a96e; padding: 1.25rem 1.5rem; margin: 2rem 0; position: relative; }
+    .chorus::before { content: '✦'; position: absolute; top: -0.7rem; left: 50%; transform: translateX(-50%); background: #f2e8d0; padding: 0 0.5rem; color: #8b6914; font-size: 0.8rem; }
+    .chorus .verse-label { color: #6b4c2a; }
+    .chorus p { font-style: italic; font-weight: 700; }
+    .strikethru { text-decoration: line-through; color: #aaa; }
+    .footnote { font-size: 0.75rem; color: #8b6914; font-style: italic; margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #c8a96e; }
+    footer { background: #2a1f0e; color: #6b4c2a; text-align: center; padding: 1rem; font-size: 0.7rem; margin-top: 3rem; letter-spacing: 1px; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <div class="grain"></div>
+  <header>
+    <div class="masthead-title">The Honky Tonk Archive</div>
+    <div class="masthead-sub">Preserving the songs that built the roadhouses</div>
+  </header>
+  <hr class="rule">
+  <div class="outer" id="song-content">
+    <div class="dateline">Country · Recorded 1962 · Doolin Ranch Sessions</div>
+    <h1>Sawdust &amp; Kerosene</h1>
+    <div class="byline">Written and performed by Hank Doolin &mdash; transcribed by R. Whitmore, 1978</div>
+
+    <div class="verse">
+      <div class="verse-label">Verse 1</div>
+      <p>The barroom floor is sawdust-thick and twenty years of boots</p>
+      <p>Have worn a path from the door to the bar to the broken jukebox</p>
+      <p>I've been standing at the end of that path since my daddy brought me in</p>
+      <p>Said, son, this is the family church, and it smells of our next of kin</p>
+    </div>
+
+    <div class="chorus">
+      <div class="verse-label">Chorus</div>
+      <p>Sawdust and kerosene, that's all this life has been</p>
+      <p>Splinter in your thumb and a lamp that burns too clean</p>
+      <p>But I'd take every splinter, every blister, every long-gone dream</p>
+      <p>For one more night of sawdust and kerosene</p>
+    </div>
+
+    <div class="verse">
+      <div class="verse-label">Verse 2</div>
+      <p>Old Earl played the fiddle till his bow arm gave him up</p>
+      <p>He still sits in the corner with his <span class="strikethru">beer</span> coffee cup</p>
+      <p>Nods his head in three-four time to whatever's on the box</p>
+      <p>A man whose music lives inside him like a watch that never stops</p>
+    </div>
+
+    <div class="chorus">
+      <div class="verse-label">Chorus</div>
+      <p>Sawdust and kerosene, that's all this life has been</p>
+      <p>Splinter in your thumb and a lamp that burns too clean</p>
+      <p>But I'd take every splinter, every blister, every long-gone dream</p>
+      <p>For one more night of sawdust and kerosene</p>
+    </div>
+
+    <div class="verse">
+      <div class="verse-label">Verse 3</div>
+      <p>My wife says the place is a fire waiting to happen</p>
+      <p>She's right about that, like she's right about most things</p>
+      <p>But some fires are worth sitting next to till they catch</p>
+      <p>And some things in life only glow when they're about to go</p>
+    </div>
+
+    <div class="verse">
+      <div class="verse-label">Verse 4</div>
+      <p>They're putting a shopping mall out on Route 9</p>
+      <p>They'll take the land this bar sits on by the end of next summer</p>
+      <p>I already feel the cold from the parking lot</p>
+      <p>Already smell the concrete where the sawdust used to not</p>
+    </div>
+
+    <div class="chorus">
+      <div class="verse-label">Final Chorus</div>
+      <p>Sawdust and kerosene, that's all this life has been</p>
+      <p>Splinter in your thumb and a lamp that burns too clean</p>
+      <p>Lord, I'd take every splinter, every blister, every long-gone dream</p>
+      <p>For one more night, just one more night</p>
+      <p>One more night of sawdust and kerosene</p>
+    </div>
+
+    <p class="footnote">* Note in margin from original notebook: "change last verse — too obvious?" — H.D.</p>
+  </div>
+  <footer>The Honky Tonk Archive · © 2024 · Demo page for Sync Along development</footer>
+</body>
+</html>

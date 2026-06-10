@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Two Scoops – The Sunny Spots | SongBurst (demo)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Nunito', sans-serif; background: #fff9c4; color: #333; min-height: 100vh; }
+    header { background: #ff6b6b; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+    header .logo { color: white; font-size: 1.5rem; font-weight: 900; letter-spacing: -1px; }
+    header .tagline { color: #ffecec; font-size: 0.8rem; }
+    .hero-band { background: linear-gradient(135deg, #ff6b6b, #feca57, #48dbfb); padding: 3rem 2rem; text-align: center; }
+    .hero-band h1 { font-size: 3rem; font-weight: 900; color: white; text-shadow: 3px 3px 0 rgba(0,0,0,0.15); margin-bottom: 0.25rem; }
+    .hero-band .artist { font-size: 1.1rem; color: white; opacity: 0.9; }
+    .hero-band .badge { display: inline-block; background: white; color: #ff6b6b; font-weight: 700; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 99px; margin-top: 0.75rem; }
+    .content { max-width: 600px; margin: 0 auto; padding: 2.5rem 2rem; }
+    .lyrics-card { background: white; border-radius: 20px; padding: 2.5rem; box-shadow: 0 8px 30px rgba(255,107,107,0.15); }
+    .stanza { margin-bottom: 2rem; }
+    .stanza:last-child { margin-bottom: 0; }
+    .stanza-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #ff6b6b; margin-bottom: 0.6rem; }
+    .stanza p { font-size: 1.15rem; line-height: 1.9; color: #444; font-weight: 400; }
+    .chorus-stanza { background: #fff3cd; border-radius: 12px; padding: 1.25rem 1.5rem; }
+    .chorus-stanza .stanza-label { color: #f39c12; }
+    .chorus-stanza p { font-weight: 700; color: #333; }
+    .tags { margin-top: 1.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .tags span { background: #fff9c4; color: #888; font-size: 0.75rem; padding: 0.25rem 0.7rem; border-radius: 99px; border: 1px solid #ffe066; }
+    footer { text-align: center; padding: 2rem; font-size: 0.75rem; color: #aaa; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="logo">SongBurst ☀️</span>
+    <span class="tagline">Happy songs for happy people</span>
+  </header>
+  <div class="hero-band">
+    <h1>Two Scoops</h1>
+    <div class="artist">The Sunny Spots</div>
+    <span class="badge">🍦 Feel-Good</span>
+  </div>
+  <div class="content">
+    <div class="lyrics-card" id="lyrics-card">
+      <div class="stanza">
+        <div class="stanza-label">Verse</div>
+        <p>Tuesday morning, sidewalk warm</p>
+        <p>You said vanilla, I said strawberry</p>
+        <p>The scoop fell off, you laughed so hard</p>
+        <p>I've never loved a Tuesday more than that</p>
+      </div>
+      <div class="stanza chorus-stanza">
+        <div class="stanza-label">Chorus</div>
+        <p>Two scoops, two scoops</p>
+        <p>One for me and one for you</p>
+        <p>Two scoops, two scoops</p>
+        <p>That's enough to make it true</p>
+      </div>
+      <div class="stanza">
+        <div class="stanza-label">Verse 2</div>
+        <p>You got sprinkles on your nose</p>
+        <p>I pretended not to notice</p>
+        <p>We walked three blocks the long way home</p>
+        <p>Just to keep the afternoon from closing</p>
+      </div>
+      <div class="stanza chorus-stanza">
+        <div class="stanza-label">Chorus</div>
+        <p>Two scoops, two scoops</p>
+        <p>One for me and one for you</p>
+        <p>Two scoops, two scoops</p>
+        <p>That's enough to make it true</p>
+      </div>
+      <div class="tags">
+        <span>pop</span><span>summer</span><span>upbeat</span><span>ice cream</span>
+      </div>
+    </div>
+  </div>
+  <footer>© 2024 SongBurst (demo page for Sync Along development)</footer>
+</body>
+</html>
