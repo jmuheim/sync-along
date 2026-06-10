@@ -24,7 +24,7 @@ Open the displayed URL (or scan the QR code) on each participant's device. The p
 ### Master
 
 1. Save the bookmarklet from the server's index page to your browser's bookmarks bar. You only need to do this once.
-2. Navigate to any song/lyrics page (or use the built-in test fixture at `http://localhost:3000/demo`).
+2. Navigate to any song/lyrics page (or use the dev fixtures at `http://localhost:3000/dev`).
 3. Tap the bookmarklet to enter **pick mode**:
    - The page dims and elements are highlighted as you hover or move your finger.
    - Tap an element to share just that content, or tap **"Share whole page"** to send everything.
@@ -40,12 +40,9 @@ Open the displayed URL (or scan the QR code) on each participant's device. The p
 | `server.js` | Node.js + WebSocket server; serves static pages and relays `page`/`scroll` messages from master to all clients |
 | `client.html` | Browser app opened by participants; replaces its own content on `page` messages and scrolls on `scroll` messages |
 | `lib/bookmarklet.js` | Builds the bookmarklet source, the tiny fetch+eval stub URL, and the `/bookmarklet-code.js` endpoint payload |
-| `lib/ui.js` | Builds the server's index page HTML (QR code, bookmarklet, client URL) |
+| `lib/ui.js` | Builds the index page and `/dev` page HTML |
 | `lib/network.js` | Detects the local WiFi IP |
-| `demo.html` | Local chord-sheet fixture for development testing (`/demo`) |
+| `demos/` | Local HTML fixtures for development testing (shown in `/dev`) |
 
 - No authentication, no database, no external services — entirely local.
 
-## Todos
-
-- **CSP fallback bookmarklet:** The current bookmarklet is a tiny fetch+eval stub that breaks on sites with a strict Content Security Policy (`connect-src` or no `unsafe-eval`). The server already has `buildBookmarklet()` which produces a self-contained `javascript:` URL that isn't affected by CSP. Consider refactoring to a monolithic bookmarklet as soon as all features are implemented and work well.

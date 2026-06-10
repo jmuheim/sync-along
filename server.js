@@ -56,20 +56,6 @@ export function createServer() {
       return;
     }
 
-    {
-      const demoMatch = req.url.match(/^\/demo(?:\/([a-z0-9-]+))?$/);
-      if (demoMatch) {
-        const name = demoMatch[1] || 'echords';
-        const filePath = path.join(__dirname, 'demos', `${name}.html`);
-        if (fs.existsSync(filePath)) {
-          const html = fs.readFileSync(filePath, 'utf8');
-          res.writeHead(200, { 'Content-Type': 'text/html' });
-          serve(res, html);
-          return;
-        }
-      }
-    }
-
     if (LIVE_RELOAD && req.url === '/livereload') {
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -84,7 +70,7 @@ export function createServer() {
 
     if (req.url === '/dev') {
       const ip = getLocalIP();
-      const demoPagesDir = path.join(__dirname, 'demo-pages');
+      const demoPagesDir = path.join(__dirname, 'demos');
       let demoPages = [];
       try { demoPages = fs.readdirSync(demoPagesDir).filter(f => f.endsWith('.html')).sort(); } catch {}
       const html = buildDevHTML(ip, PORT, demoPages);
@@ -93,9 +79,9 @@ export function createServer() {
       return;
     }
 
-    const demoMatch = req.url.match(/^\/demo-pages\/([^/?#]+\.html)$/);
+    const demoMatch = req.url.match(/^\/demos\/([^/?#]+\.html)$/);
     if (demoMatch) {
-      const filePath = path.join(__dirname, 'demo-pages', demoMatch[1]);
+      const filePath = path.join(__dirname, 'demos', demoMatch[1]);
       try {
         const html = fs.readFileSync(filePath, 'utf8');
         res.writeHead(200, { 'Content-Type': 'text/html' });

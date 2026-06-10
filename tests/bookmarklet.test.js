@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildBookmarklet, buildClientScript, buildBookmarkletSource, buildStubBookmarklet, buildBookmarkletCode } from '../lib/bookmarklet.js';
+import { buildClientScript, buildBookmarkletSource, buildStubBookmarklet, buildBookmarkletCode } from '../lib/bookmarklet.js';
 
 const WS = 'ws://192.168.1.1:3000';
 
@@ -95,41 +95,20 @@ describe('buildBookmarkletSource', () => {
   });
 });
 
-describe('buildBookmarklet', () => {
-  it('returns a javascript: URL', () => {
-    const bm = buildBookmarklet('192.168.1.1', 3000);
-    expect(bm).toMatch(/^javascript:/);
-  });
-
-  it('URL-encodes special characters like braces', () => {
-    const bm = buildBookmarklet('192.168.1.1', 3000);
-    // { is encoded as %7B by encodeURIComponent
-    expect(bm).toContain('%7B');
-  });
-
-  it('embeds the correct ws URL', () => {
-    const bm = buildBookmarklet('10.0.0.5', 3000);
-    const decoded = decodeURIComponent(bm.slice('javascript:'.length));
-    expect(decoded).toContain('ws://10.0.0.5:3000');
+describe('minified bookmarklet completeness', () => {
+  it('still contains cleanup logic after minification', () => {
+    const code = buildBookmarkletCode('192.168.1.1', 3000);
+    expect(code).toContain('__circleSyncCleanup');
+    expect(code).toContain('showSavedPrompt');
+    expect(code).toContain('startPickMode');
   });
 
   it('minified output contains no // comments that would eat following code', () => {
-    const bm = buildBookmarklet('192.168.1.1', 3000);
-    const decoded = decodeURIComponent(bm.slice('javascript:'.length));
+    const code = buildBookmarkletCode('192.168.1.1', 3000);
     // A // in the minified (single-line) output would comment out everything after it,
     // except inside strings. The only legitimate // should be inside ws:// URL strings.
-    const withoutStrings = decoded.replace(/'[^']*'/g, "''").replace(/"[^"]*"/g, '""');
+    const withoutStrings = code.replace(/'[^']*'/g, "''").replace(/"[^"]*"/g, '""');
     expect(withoutStrings).not.toContain('//');
-  });
-});
-
-describe('minified bookmarklet completeness', () => {
-  it('still contains cleanup logic after minification', () => {
-    const bm = buildBookmarklet('192.168.1.1', 3000);
-    const decoded = decodeURIComponent(bm.slice('javascript:'.length));
-    expect(decoded).toContain('__circleSyncCleanup');
-    expect(decoded).toContain('showSavedPrompt');
-    expect(decoded).toContain('startPickMode');
   });
 
   it('removes hint and shareBtn from DOM before sendPage in share-whole-page path', () => {
