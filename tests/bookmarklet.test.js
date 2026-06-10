@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildBookmarklet, buildClientScript, buildBookmarkletSource } from '../lib/bookmarklet.js';
+import { buildBookmarklet, buildClientScript, buildBookmarkletSource, buildStubBookmarklet, buildBookmarkletCode } from '../lib/bookmarklet.js';
 
 const WS = 'ws://192.168.1.1:3000';
 
@@ -146,5 +146,49 @@ describe('minified bookmarklet completeness', () => {
     const source = buildBookmarkletSource(WS, buildClientScript(WS));
     expect(source).toContain('function onMouseDown');
     expect(source).toContain("removeEventListener('mousedown',onMouseDown");
+  });
+});
+
+describe('buildStubBookmarklet', () => {
+  it('returns a javascript: URL', () => {
+    const stub = buildStubBookmarklet('192.168.1.1', 3000);
+    expect(stub).toMatch(/^javascript:/);
+  });
+
+  it('decoded stub fetches /bookmarklet-code.js from the server', () => {
+    const stub = buildStubBookmarklet('10.0.0.5', 3000);
+    const decoded = decodeURIComponent(stub.slice('javascript:'.length));
+    expect(decoded).toContain('fetch(');
+    expect(decoded).toContain('http://10.0.0.5:3000/bookmarklet-code.js');
+  });
+
+  it('includes a .catch() handler', () => {
+    const stub = buildStubBookmarklet('192.168.1.1', 3000);
+    const decoded = decodeURIComponent(stub.slice('javascript:'.length));
+    expect(decoded).toContain('.catch(');
+  });
+
+  it('catch handler alerts about Content Security Policy', () => {
+    const stub = buildStubBookmarklet('192.168.1.1', 3000);
+    const decoded = decodeURIComponent(stub.slice('javascript:'.length));
+    expect(decoded).toContain('Content Security Policy');
+  });
+});
+
+describe('buildBookmarkletCode', () => {
+  it('returns the full bookmarklet logic', () => {
+    const code = buildBookmarkletCode('192.168.1.1', 3000);
+    expect(code).toContain('role=master');
+    expect(code).toContain('__circleSyncCleanup');
+  });
+
+  it('is minified to a single line', () => {
+    const code = buildBookmarkletCode('192.168.1.1', 3000);
+    expect(code.trim().split('\n').length).toBe(1);
+  });
+
+  it('embeds the correct ws URL', () => {
+    const code = buildBookmarkletCode('10.0.0.5', 3000);
+    expect(code).toContain('ws://10.0.0.5:3000');
   });
 });

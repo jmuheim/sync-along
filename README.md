@@ -45,3 +45,7 @@ Open the displayed URL (or scan the QR code) on each participant's device. The p
 | `demo.html` | Local chord-sheet fixture for development testing (`/demo`) |
 
 - No authentication, no database, no external services — entirely local.
+
+## Todos
+
+- **CSP fallback bookmarklet:** The current bookmarklet is a tiny fetch+eval stub that breaks on sites with a strict Content Security Policy (`connect-src` or no `unsafe-eval`). The server already has `buildBookmarklet()` which produces a self-contained `javascript:` URL that isn't affected by CSP. Consider refactoring to a monolithic bookmarklet as soon as all features are implemented and work well.
