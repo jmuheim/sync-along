@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { getLocalIP } from './lib/network.js';
-import { buildIndexHTML } from './lib/ui.js';
+import { buildIndexHTML, buildDevHTML } from './lib/ui.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 3000;
@@ -26,6 +26,31 @@ export function createServer() {
       const clientHTML = fs.readFileSync(path.join(__dirname, 'client.html'), 'utf8');
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(clientHTML);
+      return;
+    }
+
+    if (req.url === '/dev') {
+      const ip = getLocalIP();
+      const demoPagesDir = path.join(__dirname, 'demo-pages');
+      let demoPages = [];
+      try { demoPages = fs.readdirSync(demoPagesDir).filter(f => f.endsWith('.html')).sort(); } catch {}
+      const html = buildDevHTML(ip, PORT, demoPages);
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(html);
+      return;
+    }
+
+    const demoMatch = req.url.match(/^\/demo-pages\/([^/?#]+\.html)$/);
+    if (demoMatch) {
+      const filePath = path.join(__dirname, 'demo-pages', demoMatch[1]);
+      try {
+        const html = fs.readFileSync(filePath, 'utf8');
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(html);
+      } catch {
+        res.writeHead(404);
+        res.end('Not found');
+      }
       return;
     }
 
