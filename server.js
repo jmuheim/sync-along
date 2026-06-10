@@ -11,7 +11,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 3000;
 const LIVE_RELOAD = process.env.LIVE_RELOAD === '1';
 
-const LIVE_RELOAD_SCRIPT = `<script>(function(){var c=false;function r(){var e=new EventSource('/livereload');e.onopen=function(){if(c)location.reload();c=true;};e.onmessage=function(m){if(m.data==='reload')location.reload();};e.onerror=function(){e.close();setTimeout(r,1000)};}r();})();</script>`;
+// EventSource auto-reconnects on its own; we just track whether the connection
+// has ever been open so we can reload on the *next* onopen (= server restarted).
+const LIVE_RELOAD_SCRIPT = `<script>(function(){var d=false;var e=new EventSource('/livereload');e.onopen=function(){if(d)location.reload();};e.onmessage=function(m){if(m.data==='reload')location.reload();};e.onerror=function(){d=true;};})();</script>`;
 
 function injectLiveReload(html) {
   return html.replace(/<\/body>/i, LIVE_RELOAD_SCRIPT + '</body>');
@@ -74,7 +76,7 @@ export function createServer() {
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
       });
-      res.write('data: connected\n\n');
+      res.write('retry: 500\ndata: connected\n\n');
       reloadClients.add(res);
       req.on('close', () => reloadClients.delete(res));
       return;
