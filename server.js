@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { getLocalIP } from './lib/network.js';
 import { buildIndexHTML } from './lib/ui.js';
+import { buildBookmarkletCode } from './lib/bookmarklet.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 3000;
@@ -26,6 +27,21 @@ export function createServer() {
       const clientHTML = fs.readFileSync(path.join(__dirname, 'client.html'), 'utf8');
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(clientHTML);
+      return;
+    }
+
+    if (req.url === '/bookmarklet-code.js') {
+      const ip = getLocalIP();
+      const code = buildBookmarkletCode(ip, PORT);
+      res.writeHead(200, { 'Content-Type': 'application/javascript', 'Cache-Control': 'no-store' });
+      res.end(code);
+      return;
+    }
+
+    if (req.url === '/demo') {
+      const demoHTML = fs.readFileSync(path.join(__dirname, 'demo.html'), 'utf8');
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(demoHTML);
       return;
     }
 
