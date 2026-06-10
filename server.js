@@ -56,20 +56,6 @@ export function createServer() {
       return;
     }
 
-    {
-      const demoMatch = req.url.match(/^\/demo(?:\/([a-z0-9-]+))?$/);
-      if (demoMatch) {
-        const name = demoMatch[1] || 'echords';
-        const filePath = path.join(__dirname, 'demos', `${name}.html`);
-        if (fs.existsSync(filePath)) {
-          const html = fs.readFileSync(filePath, 'utf8');
-          res.writeHead(200, { 'Content-Type': 'text/html' });
-          serve(res, html);
-          return;
-        }
-      }
-    }
-
     if (LIVE_RELOAD && req.url === '/livereload') {
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -149,7 +135,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   if (LIVE_RELOAD) {
     fs.watch(path.join(__dirname, 'client.html'), () => broadcastReload());
-    fs.watch(path.join(__dirname, 'demos'), { recursive: true }, (_, filename) => {
+    fs.watch(path.join(__dirname, 'demo-pages'), { recursive: true }, (_, filename) => {
       if (!filename || filename.endsWith('.html')) broadcastReload();
     });
     console.log('Live reload enabled.');
