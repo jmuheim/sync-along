@@ -5,27 +5,80 @@ import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { getLocalIP } from './lib/network.js';
 import { buildIndexHTML, buildDevHTML } from './lib/ui.js';
+import { buildBookmarkletCode } from './lib/bookmarklet.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 3000;
+const LIVE_RELOAD = process.env.LIVE_RELOAD === '1';
+
+// EventSource auto-reconnects on its own; we just track whether the connection
+// has ever been open so we can reload on the *next* onopen (= server restarted).
+const LIVE_RELOAD_SCRIPT = `<script>(function(){var d=false;var e=new EventSource('/livereload');e.onopen=function(){if(d)location.reload();};e.onmessage=function(m){if(m.data==='reload')location.reload();};e.onerror=function(){d=true;};})();</script>`;
+
+function injectLiveReload(html) {
+  return html.replace(/<\/body>/i, LIVE_RELOAD_SCRIPT + '</body>');
+}
+
+function serve(res, html) {
+  res.end(LIVE_RELOAD ? injectLiveReload(html) : html);
+}
 
 export function createServer() {
   let master = null;
   const clients = new Set();
+  const reloadClients = new Set();
+
+  function broadcastReload() {
+    for (const client of reloadClients) client.write('data: reload\n\n');
+  }
 
   const httpServer = http.createServer(async (req, res) => {
     if (req.url === '/' || req.url === '/index.html') {
       const ip = getLocalIP();
       const html = await buildIndexHTML(ip, PORT);
       res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(html);
+      serve(res, html);
       return;
     }
 
     if (req.url === '/client.html') {
-      const clientHTML = fs.readFileSync(path.join(__dirname, 'client.html'), 'utf8');
+      const html = fs.readFileSync(path.join(__dirname, 'client.html'), 'utf8');
       res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(clientHTML);
+      serve(res, html);
+      return;
+    }
+
+    if (req.url === '/bookmarklet-code.js') {
+      const ip = getLocalIP();
+      const code = buildBookmarkletCode(ip, PORT);
+      res.writeHead(200, { 'Content-Type': 'application/javascript', 'Cache-Control': 'no-store' });
+      res.end(code);
+      return;
+    }
+
+    {
+      const demoMatch = req.url.match(/^\/demo(?:\/([a-z0-9-]+))?$/);
+      if (demoMatch) {
+        const name = demoMatch[1] || 'echords';
+        const filePath = path.join(__dirname, 'demos', `${name}.html`);
+        if (fs.existsSync(filePath)) {
+          const html = fs.readFileSync(filePath, 'utf8');
+          res.writeHead(200, { 'Content-Type': 'text/html' });
+          serve(res, html);
+          return;
+        }
+      }
+    }
+
+    if (LIVE_RELOAD && req.url === '/livereload') {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      });
+      res.write('retry: 500\ndata: connected\n\n');
+      reloadClients.add(res);
+      req.on('close', () => reloadClients.delete(res));
       return;
     }
 
@@ -87,12 +140,21 @@ export function createServer() {
     }
   });
 
-  return { httpServer, wss, getClients: () => clients, getMaster: () => master };
+  return { httpServer, wss, getClients: () => clients, getMaster: () => master, broadcastReload };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const { httpServer } = createServer();
+  const { httpServer, broadcastReload } = createServer();
   const ip = getLocalIP();
+
+  if (LIVE_RELOAD) {
+    fs.watch(path.join(__dirname, 'client.html'), () => broadcastReload());
+    fs.watch(path.join(__dirname, 'demos'), { recursive: true }, (_, filename) => {
+      if (!filename || filename.endsWith('.html')) broadcastReload();
+    });
+    console.log('Live reload enabled.');
+  }
+
   httpServer.listen(PORT, () => {
     console.log(`Sync Along running at http://${ip}:${PORT}`);
     console.log(`Local:   http://localhost:${PORT}`);
