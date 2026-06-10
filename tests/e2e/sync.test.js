@@ -32,10 +32,19 @@ test('/bookmarklet-code.js serves minified bookmarklet logic with no-store heade
   expect(body.trim().split('\n').length).toBe(1);
 });
 
-test('/demo serves the chord-sheet fixture', async ({ page }) => {
-  await page.goto(`${BASE}/demo`);
+test('/demo and /demo/echords serve the e-chords fixture', async ({ page }) => {
+  await page.goto(`${BASE}/demo/echords`);
   await expect(page.locator('#cifra_c')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Wonderwall' })).toBeVisible();
+  // bare /demo is an alias for /demo/echords
+  await page.goto(`${BASE}/demo`);
+  await expect(page.locator('#cifra_c')).toBeVisible();
+});
+
+test('/demo/ug serves the Ultimate Guitar fixture', async ({ page }) => {
+  await page.goto(`${BASE}/demo/ug`);
+  await expect(page.locator('.js-tab-content')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Wonderwall/i })).toBeVisible();
 });
 
 test('stub bookmarklet catch handler fires an alert when fetch is blocked', async ({ browser }) => {

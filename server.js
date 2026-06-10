@@ -38,11 +38,17 @@ export function createServer() {
       return;
     }
 
-    if (req.url === '/demo') {
-      const demoHTML = fs.readFileSync(path.join(__dirname, 'demo.html'), 'utf8');
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(demoHTML);
-      return;
+    {
+      const demoMatch = req.url.match(/^\/demo(?:\/([a-z0-9-]+))?$/);
+      if (demoMatch) {
+        const name = demoMatch[1] || 'echords';
+        const filePath = path.join(__dirname, 'demos', `${name}.html`);
+        if (fs.existsSync(filePath)) {
+          res.writeHead(200, { 'Content-Type': 'text/html' });
+          res.end(fs.readFileSync(filePath, 'utf8'));
+          return;
+        }
+      }
     }
 
     res.writeHead(404);
