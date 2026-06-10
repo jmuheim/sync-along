@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createServer } from '../../server.js';
-import { buildBookmarkletSource, buildClientScript } from '../../lib/bookmarklet.js';
+import { buildBookmarkletSource, buildClientScript, buildStubBookmarklet } from '../../lib/bookmarklet.js';
 
 const PORT = 3001;
 const BASE = `http://localhost:${PORT}`;
@@ -18,6 +18,55 @@ test.afterAll(async () => {
   server.wss.clients.forEach((ws) => ws.terminate());
   await new Promise((resolve) => server.wss.close(resolve));
   await new Promise((resolve) => server.httpServer.close(resolve));
+});
+
+// ─── New endpoints ─────────────────────────────────────────────────────────────
+
+test('/bookmarklet-code.js serves minified bookmarklet logic with no-store header', async ({ page }) => {
+  const response = await page.request.get(`${BASE}/bookmarklet-code.js`);
+  expect(response.status()).toBe(200);
+  expect(response.headers()['content-type']).toContain('application/javascript');
+  expect(response.headers()['cache-control']).toBe('no-store');
+  const body = await response.text();
+  expect(body).toContain('role=master');
+  expect(body.trim().split('\n').length).toBe(1);
+});
+
+test('/demo and /demo/echords serve the e-chords fixture', async ({ page }) => {
+  await page.goto(`${BASE}/demo/echords`);
+  await expect(page.locator('#cifra_c')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Wonderwall' })).toBeVisible();
+  // bare /demo is an alias for /demo/echords
+  await page.goto(`${BASE}/demo`);
+  await expect(page.locator('#cifra_c')).toBeVisible();
+});
+
+test('/demo/ug serves the Ultimate Guitar fixture', async ({ page }) => {
+  await page.goto(`${BASE}/demo/ug`);
+  await expect(page.locator('.js-tab-content')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Wonderwall/i })).toBeVisible();
+});
+
+test('stub bookmarklet catch handler fires an alert when fetch is blocked', async ({ browser }) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto(BASE);
+
+  // Abort the request to simulate what a CSP connect-src violation does (rejects the fetch)
+  await page.route(`${BASE}/bookmarklet-code.js`, route => route.abort());
+
+  const dialogPromise = page.waitForEvent('dialog');
+
+  // Decode and evaluate the real stub so we test the actual generated code
+  const stub = buildStubBookmarklet('localhost', PORT);
+  const stubCode = decodeURIComponent(stub.slice('javascript:'.length));
+  page.evaluate(stubCode).catch(() => {});
+
+  const dialog = await dialogPromise;
+  expect(dialog.message()).toContain('Content Security Policy');
+  await dialog.dismiss();
+
+  await ctx.close();
 });
 
 // ─── Index page ────────────────────────────────────────────────────────────────
