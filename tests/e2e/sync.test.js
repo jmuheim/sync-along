@@ -32,19 +32,16 @@ test('/bookmarklet-code.js serves minified bookmarklet logic with no-store heade
   expect(body.trim().split('\n').length).toBe(1);
 });
 
-test('/demo and /demo/echords serve the e-chords fixture', async ({ page }) => {
-  await page.goto(`${BASE}/demo/echords`);
-  await expect(page.locator('#cifra_c')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Wonderwall' })).toBeVisible();
-  // bare /demo is an alias for /demo/echords
-  await page.goto(`${BASE}/demo`);
-  await expect(page.locator('#cifra_c')).toBeVisible();
+test('/demos/e-chords.html serves the e-chords fixture', async ({ page }) => {
+  await page.goto(`${BASE}/demos/e-chords.html`);
+  await expect(page.locator('#chord-lyrics')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Hallelujah' })).toBeVisible();
 });
 
-test('/demo/ug serves the Ultimate Guitar fixture', async ({ page }) => {
-  await page.goto(`${BASE}/demo/ug`);
-  await expect(page.locator('.js-tab-content')).toBeVisible();
-  await expect(page.getByRole('heading', { name: /Wonderwall/i })).toBeVisible();
+test('/demos/ultimate-guitar.html serves the Ultimate Guitar fixture', async ({ page }) => {
+  await page.goto(`${BASE}/demos/ultimate-guitar.html`);
+  await expect(page.locator('.chord-sheet')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Knockin' On Heaven's Door/i })).toBeVisible();
 });
 
 test('stub bookmarklet catch handler fires an alert when fetch is blocked', async ({ browser }) => {
