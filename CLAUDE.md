@@ -50,7 +50,7 @@ A local WiFi app where a master device controls what song/page all client device
 
 **Testing**
 - Always update existing tests when changing related code
-- Add new tests for new or changed features when reasonable
+- Add new tests for new or changed features when reasonable, but ask the user first
 
 **Edge cases to handle**
 - When `document.write()` replaces the page, the new page must immediately re-connect the WebSocket — the injected script handles this
