@@ -825,6 +825,55 @@ test('viewport bar thumb moves from top to bottom as master scrolls', async ({ b
   await clientCtx.close();
 });
 
+test('viewport bar updates when client changes orientation', async ({ browser }) => {
+  // Master: 800×400, element W=200 → vMasterContent = 400*200/800 = 100px
+  // Portrait 390×844: c.height ≈ 844*(200/390) ≈ 433 >> 100 → full bar
+  // Landscape 844×390: c.height ≈ 390*(200/844) ≈ 92 < 100 → partial bar
+  const masterCtx = await browser.newContext({ viewport: { width: 800, height: 400 } });
+  const masterPage = await masterCtx.newPage();
+  await masterPage.goto(BASE);
+  await masterPage.setContent(`
+    <html><body style="margin:0">
+      <div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Song</p></div>
+    </body></html>
+  `);
+
+  const clientCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true });
+  const clientPage = await clientCtx.newPage();
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  const clientScript = buildClientScript(WS);
+  await masterPage.evaluate(buildBookmarkletSource(WS, clientScript));
+  await expect(masterPage.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
+
+  const box = await masterPage.locator('#lyrics').boundingBox();
+  await masterPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(masterPage.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
+
+  const getThumbH = () => masterPage.evaluate(() => {
+    const thumb = document.getElementById('__circleSyncBars')?.children[0]?.children[0];
+    return thumb ? parseFloat(thumb.style.height) : null;
+  });
+
+  // Wait for portrait bar (full height = 400)
+  await expect(async () => {
+    expect(await getThumbH()).toBeCloseTo(400, 0);
+  }).toPass({ timeout: 5000 });
+
+  // Simulate rotation to landscape
+  await clientPage.setViewportSize({ width: 844, height: 390 });
+
+  // Bar should shrink: landscape c.height < vMasterContent → partial bar
+  await expect(async () => {
+    const h = await getThumbH();
+    expect(h).toBeLessThan(400);
+  }).toPass({ timeout: 2000 });
+
+  await masterCtx.close();
+  await clientCtx.close();
+});
+
 // ─── Proportional scroll — end-to-end ──────────────────────────────────────────
 
 test('ratio 1.0 positions client at the true scrollable bottom, not past it', async ({ browser }) => {

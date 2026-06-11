@@ -19,6 +19,13 @@ describe('buildClientScript', () => {
     expect(script).toContain('setTimeout(connect');
   });
 
+  it('re-sends viewport height on window resize via debounced listener', () => {
+    const script = buildClientScript(WS);
+    expect(script).toContain("addEventListener('resize'");
+    expect(script).toContain('clearTimeout(resizeTimer)');
+    expect(script).toContain('setTimeout(sendViewport');
+  });
+
   it('handles both page and scroll message types', () => {
     const script = buildClientScript(WS);
     expect(script).toContain("m.type==='page'");
