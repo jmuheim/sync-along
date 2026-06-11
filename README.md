@@ -46,6 +46,16 @@ Open the displayed URL (or scan the QR code) on each participant's device. The p
 
 - No authentication, no database, no external services — entirely local.
 
+## Bookmarklet size
+
+The bookmarklet currently uses a **fetch+eval loader** pattern: the dragged bookmark is a tiny ~258-char stub that fetches the real code from the server on every tap. The full minified logic is ~12 KB, which as an inline `javascript:` URL would be ~15 KB.
+
+Modern browsers handle inline bookmarklets of that size without issues (Chrome has a ~2 MB limit; Firefox and Safari have no meaningful hard limit). So size is **not a blocker** for inlining all code into the bookmark itself.
+
+The loader pattern is kept for a different reason: during development you drag it once and always get the latest server-side code on every tap — no re-dragging needed after changes. If the bookmarklet were inlined, you'd need to re-save it after every code change.
+
+If the code ever needs to shrink further (e.g. for a standalone distribution), the main levers are replacing the custom `minify()` function in `lib/bookmarklet.js` with a proper tool like `terser`, and more aggressive variable-name shortening.
+
 ## Todos
 
 - **Client viewport bar accuracy:** The per-client bars on the master view are a good approximation but not 100% accurate — real device browsers (especially iOS Safari) may report `window.innerHeight` differently than Chromium's proportional scaling assumes. Good enough for now.
