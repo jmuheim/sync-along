@@ -1,3 +1,4 @@
+import vm from 'vm';
 import { describe, it, expect } from 'vitest';
 import { buildClientScript, buildBookmarkletSource, buildStubBookmarklet, buildBookmarkletCode } from '../lib/bookmarklet.js';
 
@@ -125,6 +126,11 @@ describe('buildBookmarkletSource', () => {
 });
 
 describe('minified bookmarklet completeness', () => {
+  it('minified output is syntactically valid JavaScript', () => {
+    const code = buildBookmarkletCode('192.168.1.1', 3000);
+    expect(() => new vm.Script(code)).not.toThrow();
+  });
+
   it('still contains cleanup logic after minification', () => {
     const code = buildBookmarkletCode('192.168.1.1', 3000);
     expect(code).toContain('__circleSyncCleanup');
@@ -154,6 +160,18 @@ describe('minified bookmarklet completeness', () => {
     const source = buildBookmarkletSource(WS, buildClientScript(WS));
     expect(source).toContain('function onMouseDown');
     expect(source).toContain("removeEventListener('mousedown',onMouseDown");
+  });
+
+  it('shareBtn and onPick both use if/else for WS readyState so no open listener is orphaned', () => {
+    const source = buildBookmarkletSource(WS, buildClientScript(WS));
+    // Both sendPage call sites must check readyState first and only attach the open
+    // listener in the else branch — never unconditionally before the readyState check.
+    const ifElseMatches = source.match(
+      /if\(ws\.readyState===ws\.OPEN\)\{var h=sendPage\(/g
+    ) || [];
+    expect(ifElseMatches.length).toBe(2);
+    // Confirm neither call site adds the listener before the readyState check
+    expect(source).not.toMatch(/ws\.addEventListener\('open'[^)]+\);\s*if\(ws\.readyState/);
   });
 });
 
