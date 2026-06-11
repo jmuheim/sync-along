@@ -42,6 +42,9 @@ A local WiFi app where a master device controls what song/page all client device
 - Auto-detect the server's local WiFi IP and display it
 - No authentication, no database, no external services — entirely local
 
+**Pull Requests**
+- When pushing to a pull request, update the PR description to reflect the current state of the changes
+
 **Documentation**
 - After any significant change, check `CLAUDE.md` and `README.md` for missing or outdated information and update them accordingly
 
