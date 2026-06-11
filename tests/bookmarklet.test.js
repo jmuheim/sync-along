@@ -43,6 +43,28 @@ describe('buildClientScript', () => {
     const script = buildClientScript(WS);
     expect(script).toContain('role=client');
   });
+
+  it('sends window.innerHeight as viewport height on connect', () => {
+    const script = buildClientScript(WS);
+    expect(script).toContain('window.innerHeight');
+    expect(script).toContain("type:'viewport'");
+  });
+
+  it('re-sends viewport on requestViewport message', () => {
+    const script = buildClientScript(WS);
+    expect(script).toContain("m.type==='requestViewport'");
+    expect(script).toContain('sendViewport');
+  });
+
+  it('ws is declared at outer scope so resize listener always uses current connection', () => {
+    const script = buildClientScript(WS);
+    // ws must be declared before connect() so the resize listener (also at outer scope) can
+    // reference it without closing over a stale per-call local variable
+    const wsDecl = script.indexOf('var ws=null');
+    const connectDecl = script.indexOf('function connect()');
+    expect(wsDecl).toBeGreaterThan(-1);
+    expect(wsDecl).toBeLessThan(connectDecl);
+  });
 });
 
 describe('buildBookmarkletSource', () => {
@@ -193,6 +215,36 @@ describe('proportional scroll — buildClientScript', () => {
   it('scrolls to ratio * scrollable, not ratio * scrollHeight', () => {
     const script = buildClientScript(WS);
     expect(script).toContain('m.ratio*scrollable');
+  });
+});
+
+describe('client viewport bars — buildBookmarkletSource', () => {
+  const source = buildBookmarkletSource(WS, buildClientScript(WS));
+
+  it('handles viewport message from clients and stores height by clientId', () => {
+    expect(source).toContain("m.type==='viewport'");
+    expect(source).toContain('clients[m.clientId]');
+  });
+
+  it('handles clientLeft message and removes client from map', () => {
+    expect(source).toContain("m.type==='clientLeft'");
+    expect(source).toContain('delete clients[m.clientId]');
+  });
+
+  it('creates bars container with id __circleSyncBars for test selection', () => {
+    expect(source).toContain("clientBarsEl.id='__circleSyncBars'");
+  });
+
+  it('suppresses client script in master iframe via __circleSyncClient guard', () => {
+    expect(source).toContain('window.__circleSyncClient=true');
+  });
+
+  it('computes vMasterContent using zoom-aware iframe dimensions', () => {
+    expect(source).toContain('iframeVpH*lastElWidth/iframeVpW');
+  });
+
+  it('uses vMasterContent as reference height when computing bar fraction', () => {
+    expect(source).toContain('c.height/vMasterContent');
   });
 });
 
