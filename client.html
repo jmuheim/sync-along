@@ -5,14 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
   <title>Sync Along client</title>
   <style>
-    body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #a8b2d8; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; text-align: center; padding: 2rem; }
+    body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #a8b2d8; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; text-align: center; padding: 2rem; scrollbar-width: none; }
+    body::-webkit-scrollbar { display: none; }
     #status { font-size: 1.2rem; margin-bottom: 1rem; }
     #status.connected { color: #64ffda; }
     #status.disconnected { color: #e94560; }
     .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: currentColor; margin-right: 6px; }
-    #debug-bar { position: fixed; top: 0; left: 0; right: 0; background: rgba(15,52,96,0.92); color: #a8b2d8; padding: 0.35rem 0.75rem; font-size: 0.72rem; font-family: system-ui, monospace, sans-serif; display: flex; align-items: center; gap: 0.6rem; z-index: 9999; line-height: 1; border-bottom: 1px solid rgba(100,255,218,0.15); }
+    #debug-bar { position: fixed; bottom: 0.5rem; right: 0.5rem; background: rgba(15,52,96,0.92); color: #a8b2d8; border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.72rem; font-family: system-ui, monospace, sans-serif; z-index: 9999; line-height: 1.6; border: 1px solid rgba(100,255,218,0.2); pointer-events: none; }
     #debug-badge { background: #555; color: #0a0a1a; padding: 2px 8px; border-radius: 10px; font-weight: bold; font-size: 0.7rem; }
-    #debug-dims { color: #6b7db3; }
+    #debug-dims { color: #6b7db3; display: block; }
   </style>
 </head>
 <body>
@@ -104,6 +105,7 @@
               debugBadge.textContent = m.name;
               debugBadge.style.background = CLIENT_COLORS[m.colorIndex % CLIENT_COLORS.length];
             }
+            try { sessionStorage.setItem('__circleSyncId', JSON.stringify({ name: m.name, colorIndex: m.colorIndex })); } catch(e) {}
           }
         };
         ws.onclose = function () {
