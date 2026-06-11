@@ -233,7 +233,7 @@ test('bookmarklet enters pick mode: dims page, shows hint and share button; pick
   await songPage.evaluate(bookmarkletCode);
 
   // Pick mode active: overlay, hint, and share button all visible
-  await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(songPage.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
   await expect(songPage.getByText('Tap the lyrics container')).toBeVisible();
   await expect(songPage.getByText('Share whole page')).toBeVisible();
 
@@ -272,7 +272,7 @@ test('"Share whole page" sends full body to clients without entering pick', asyn
   const bookmarkletCode = buildBookmarkletSource(WS, clientScript);
   await songPage.evaluate(bookmarkletCode);
 
-  await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(songPage.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
 
   const clientPage = await browser.newPage();
   await clientPage.goto(`${BASE}/client.html`);
@@ -303,7 +303,7 @@ test('selector memory: second bookmarklet tap on same domain shows saved-element
 
   // First activation — pick an element to store the selector
   await page.evaluate(code);
-  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(page.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
   const box = await page.locator('#lyrics').boundingBox();
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(page.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
@@ -417,7 +417,7 @@ test('selector memory "Use it" shares the saved element and shows master view', 
 
   // First tap: pick the element to save the selector
   await songPage.evaluate(code);
-  await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(songPage.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
   const box = await songPage.locator('#lyrics').boundingBox();
   await songPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(songPage.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
@@ -451,7 +451,7 @@ test('selector memory "Change?" re-enters pick mode', async ({ browser }) => {
 
   // First tap: pick to save selector
   await page.evaluate(code);
-  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(page.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
   const box = await page.locator('#lyrics').boundingBox();
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(page.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
@@ -464,7 +464,7 @@ test('selector memory "Change?" re-enters pick mode', async ({ browser }) => {
   // Click "Change?" — prompt disappears and full pick mode starts
   await page.getByText('Change?').click();
   await expect(page.getByText('Change?')).not.toBeVisible({ timeout: 3000 });
-  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(page.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
   await expect(page.getByText('Tap the lyrics container')).toBeVisible();
 
   await ctx.close();
@@ -482,7 +482,7 @@ test('master view close button dismisses the overlay', async ({ browser }) => {
   const code = buildBookmarkletSource(WS, clientScript);
 
   await page.evaluate(code);
-  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(page.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
   const box = await page.locator('#lyrics').boundingBox();
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(page.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
@@ -508,14 +508,13 @@ test('master view hides original page content and restores it on close', async (
   const code = buildBookmarkletSource(WS, clientScript);
 
   await page.evaluate(code);
-  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(page.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
   const box = await page.locator('#lyrics').boundingBox();
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(page.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
 
   // Body must be hidden to prevent original page showing through elastic overscroll
-  const bodyVisibility = await page.evaluate(() => document.body.style.visibility);
-  expect(bodyVisibility).toBe('hidden');
+  await expect(page.locator('body')).toHaveCSS('visibility', 'hidden');
 
   // iframe and close button must remain visible despite body being hidden
   await expect(page.locator('iframe#__circleSyncView')).toBeVisible();
@@ -524,8 +523,7 @@ test('master view hides original page content and restores it on close', async (
   // Closing must restore body visibility
   await page.locator('#__circleSyncCloseBtn').click();
   await expect(page.locator('iframe#__circleSyncView')).not.toBeAttached({ timeout: 3000 });
-  const bodyVisibilityAfter = await page.evaluate(() => document.body.style.visibility);
-  expect(bodyVisibilityAfter).toBe('');
+  await expect(page.locator('body')).toHaveCSS('visibility', 'visible');
 
   await ctx.close();
 });
@@ -543,12 +541,12 @@ test('re-tapping bookmarklet cleans up previous WS and pick mode', async ({ brow
 
   // First tap — wait for pick mode to start
   await page.evaluate(code);
-  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(page.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
 
   // Second tap: cleanup runs synchronously, then pick mode restarts once ws.onopen fires
   await page.evaluate(code);
   // Wait for the new overlay to appear, then confirm there's exactly one (no stacking)
-  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(page.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
   expect(await page.locator('#__circleSyncOverlay').count()).toBe(1);
 
   await ctx.close();
@@ -566,7 +564,7 @@ test('arrow indicator appears when master view opens and is removed on close', a
   const code = buildBookmarkletSource(WS, clientScript);
   await page.evaluate(code);
 
-  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(page.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
   const box = await page.locator('#lyrics').boundingBox();
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(page.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
@@ -591,7 +589,7 @@ test('arrow is positioned on the right side of the viewport', async ({ browser }
 
   const code = buildBookmarkletSource(WS, buildClientScript(WS));
   await page.evaluate(code);
-  await expect(page.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(page.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
   const box = await page.locator('#lyrics').boundingBox();
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(page.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
@@ -658,7 +656,7 @@ test('picked sub-element: viewport meta scales CSS pixel viewport to element wid
 
   const clientScript = buildClientScript(WS);
   await songPage.evaluate(buildBookmarkletSource(WS, clientScript));
-  await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(songPage.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
 
   // Use a mobile context so viewport meta actually takes effect (desktop Chromium ignores it)
   const mobileCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true });
@@ -690,7 +688,7 @@ test('"Share whole page" sends device-width viewport to clients', async ({ brows
 
   const clientScript = buildClientScript(WS);
   await songPage.evaluate(buildBookmarkletSource(WS, clientScript));
-  await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(songPage.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
 
   const clientPage = await browser.newPage();
   await clientPage.goto(`${BASE}/client.html`);
@@ -723,7 +721,7 @@ test('source page viewport meta is stripped and replaced with element-width view
 
   const clientScript = buildClientScript(WS);
   await songPage.evaluate(buildBookmarkletSource(WS, clientScript));
-  await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(songPage.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
 
   const clientPage = await browser.newPage();
   await clientPage.goto(`${BASE}/client.html`);
@@ -756,7 +754,7 @@ test('master iframe body gets zoom applied to fill viewport width', async ({ bro
 
   const clientScript = buildClientScript(WS);
   await songPage.evaluate(buildBookmarkletSource(WS, clientScript));
-  await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  await expect(songPage.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
   const box = await songPage.locator('#lyrics').boundingBox();
   await songPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(songPage.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
