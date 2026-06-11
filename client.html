@@ -18,25 +18,39 @@
     (function () {
       var wsURL = 'ws://' + location.host + '?role=client';
       var lastRatio = -1;
+      var ws = null;
+      var resizeTimer = null;
+      var status = document.getElementById('status');
+
+      function sendViewport() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'viewport', height: window.innerHeight }));
+        }
+      }
+
+      // Re-send when browser window is resized — but only while this script is still
+      // in control (the injected client script sets __circleSyncClient when it takes over).
+      window.addEventListener('resize', function () {
+        if (window.__circleSyncClient) return;
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(sendViewport, 300);
+      });
+
       function connect() {
-        var ws = new WebSocket(wsURL);
-        var status = document.getElementById('status');
+        ws = new WebSocket(wsURL);
         ws.onopen = function () {
           if (status) { status.className = 'connected'; status.innerHTML = '<span class="dot"></span>Connected'; }
+          // Expose this WS so the injected script can close it cleanly when it takes over.
+          window.__circleSyncClientWS = ws;
+          sendViewport();
         };
         ws.onmessage = function (e) {
           var m = JSON.parse(e.data);
           if (m.type === 'page') {
-            // Reset scroll state so the new page always starts from a clean baseline.
-            // lastRatio must be -1 because the injected script's WS survives document.write
-            // (window.__circleSyncClient stays set), so its stale ratio from the previous
-            // page would otherwise corrupt the direction logic on the first scroll message.
             lastRatio = -1;
             document.open();
             document.write(m.html);
             document.close();
-            // Explicit scroll-to-top in case the browser preserves scroll position
-            // across document.write (not guaranteed by the spec).
             window.scrollTo(0, 0);
           } else if (m.type === 'scroll') {
             if (m.ratio !== lastRatio) {
@@ -47,9 +61,13 @@
               if ((down && m.ratio > clientRatio) || (!down && m.ratio < clientRatio))
                 window.scrollTo(0, m.ratio * scrollable);
             }
+          } else if (m.type === 'requestViewport') {
+            sendViewport();
           }
         };
         ws.onclose = function () {
+          // Stop reconnecting once the injected script has taken over; it manages its own WS.
+          if (window.__circleSyncClient) return;
           if (status) { status.className = 'disconnected'; status.innerHTML = '<span class="dot"></span>Reconnecting…'; }
           setTimeout(connect, 2000);
         };
