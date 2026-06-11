@@ -689,11 +689,11 @@ test('viewport bar height: client shorter than master → bar covers partial hei
   const vMasterContent = iframeVpH * 200 / iframeVpW;
   expect(vMasterContent).toBe(50);
 
-  // Bar thumb height: frac=25/50=0.5, thumbH=0.5*200=100
+  // Bar thumb height: frac=25/50=0.5, thumbH=50% of track → 100px rendered
   const thumbH = await masterPage.evaluate(() => {
     const bars = document.getElementById('__circleSyncBars');
     const thumb = bars?.children[0]?.children[0];
-    return thumb ? parseFloat(thumb.style.height) : null;
+    return thumb ? thumb.getBoundingClientRect().height : null;
   });
   const expectedThumbH = Math.min(1, clientInnerH / vMasterContent) * screenH;
   expect(thumbH).toBeCloseTo(expectedThumbH, 0);
@@ -754,9 +754,9 @@ test('viewport bar height: client taller than master → bar is full height', as
   const thumbH = await masterPage.evaluate(() => {
     const bars = document.getElementById('__circleSyncBars');
     const thumb = bars?.children[0]?.children[0];
-    return thumb ? parseFloat(thumb.style.height) : null;
+    return thumb ? thumb.getBoundingClientRect().height : null;
   });
-  // Full bar: thumbH should equal screenH
+  // Full bar: thumb fills the entire track (100%) → rendered height ≈ screenH
   expect(thumbH).toBeCloseTo(screenH, 0);
 
   await masterCtx.close();
@@ -798,8 +798,10 @@ test('viewport bar thumb moves from top to bottom as master scrolls', async ({ b
 
   const getThumbTop = () => masterPage.evaluate(() => {
     const bars = document.getElementById('__circleSyncBars');
-    const thumb = bars?.children[0]?.children[0];
-    return thumb ? parseFloat(thumb.style.top) : null;
+    const track = bars?.children[0];
+    const thumb = track?.children[0];
+    if (!track || !thumb) return null;
+    return thumb.getBoundingClientRect().top - track.getBoundingClientRect().top;
   });
 
   // At ratio=0 (top), thumb top should be 0
@@ -854,7 +856,7 @@ test('viewport bar updates when desktop client resizes the browser window', asyn
 
   const getThumbH = () => masterPage.evaluate(() => {
     const thumb = document.getElementById('__circleSyncBars')?.children[0]?.children[0];
-    return thumb ? parseFloat(thumb.style.height) : null;
+    return thumb ? thumb.getBoundingClientRect().height : null;
   });
 
   // Wait for bar to stabilise at full height (c.height=600 >> vMasterContent=100)
@@ -902,7 +904,7 @@ test('viewport bar updates when client changes orientation', async ({ browser })
 
   const getThumbH = () => masterPage.evaluate(() => {
     const thumb = document.getElementById('__circleSyncBars')?.children[0]?.children[0];
-    return thumb ? parseFloat(thumb.style.height) : null;
+    return thumb ? thumb.getBoundingClientRect().height : null;
   });
 
   // Wait for portrait bar (full height = 400)
