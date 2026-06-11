@@ -42,6 +42,16 @@ A local WiFi app where a master device controls what song/page all client device
 - Auto-detect the server's local WiFi IP and display it
 - No authentication, no database, no external services — entirely local
 
+**Pull Requests**
+- When pushing to a pull request, update the PR description to reflect the current state of the changes
+
+**Documentation**
+- After any significant change, check `CLAUDE.md` and `README.md` for missing or outdated information and update them accordingly
+
+**Testing**
+- Always update existing tests when changing related code
+- Add new tests for new or changed features when reasonable, but ask the user first
+
 **Edge cases to handle**
 - When `document.write()` replaces the page, the new page must immediately re-connect the WebSocket — the injected script handles this
 - The bookmarklet must be re-tappable: navigating to a new song and tapping again should cleanly replace the previous session
