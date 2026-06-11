@@ -261,8 +261,18 @@ describe('client viewport bars — buildBookmarkletSource', () => {
     expect(source).toContain('iframeVpH*lastElWidth/iframeVpW');
   });
 
-  it('uses vMasterContent as reference height when computing bar fraction', () => {
-    expect(source).toContain('c.height/vMasterContent');
+  it('uses zoom-adjusted client content height against vMasterContent for bar fraction', () => {
+    expect(source).toContain('c.height*lastElWidth/c.width');
+    expect(source).toContain('clientContentH/vMasterContent');
+  });
+
+  it('measures natural content width via max-content for viewport meta and iframe zoom', () => {
+    expect(source).toContain('max-content');
+    expect(source).toContain('el.style.width');
+  });
+
+  it('resets body margin in injected CSS', () => {
+    expect(source).toContain('margin:0!important');
   });
 });
 
