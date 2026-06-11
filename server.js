@@ -23,11 +23,19 @@ function serve(res, html) {
   res.end(LIVE_RELOAD ? injectLiveReload(html) : html);
 }
 
+const CLIENT_NAMES = [
+  'Azure Fox', 'Coral Jay', 'Ember Owl', 'Fern Hawk', 'Ivory Wolf',
+  'Jade Raven', 'Lunar Bear', 'Mauve Crane', 'Onyx Hare', 'Pearl Lynx',
+  'Rosy Wren', 'Sage Deer', 'Teal Swan', 'Umber Kite', 'Violet Dove',
+];
+
 export function createServer() {
   let master = null;
   const clients = new Set();
+  const clientMeta = new Map(); // ws → { clientId, name, colorIndex }
   const reloadClients = new Set();
   let nextClientId = 0;
+  let nextColorIndex = 0;
 
   function broadcastReload() {
     for (const client of reloadClients) client.write('data: reload\n\n');
@@ -107,6 +115,12 @@ export function createServer() {
     if (role === 'master') {
       if (master) master.close();
       master = ws;
+      // Announce existing clients to the new master
+      for (const [clientWs, meta] of clientMeta) {
+        if (clientWs.readyState === clientWs.OPEN) {
+          master.send(JSON.stringify({ type: 'clientJoined', clientId: meta.clientId, name: meta.name, colorIndex: meta.colorIndex }));
+        }
+      }
       for (const client of clients) {
         if (client.readyState === client.OPEN) {
           client.send(JSON.stringify({ type: 'requestViewport' }));
@@ -128,20 +142,34 @@ export function createServer() {
       ws.on('close', () => { if (master === ws) master = null; });
     } else {
       const clientId = ++nextClientId;
+      const name = CLIENT_NAMES[(clientId - 1) % CLIENT_NAMES.length];
+      const colorIndex = nextColorIndex++ % 5;
+      clientMeta.set(ws, { clientId, name, colorIndex });
       clients.add(ws);
+
+      // Defer so the client's message listener is set up before this arrives.
+      setImmediate(() => {
+        if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ type: 'clientInfo', clientId, name, colorIndex }));
+      });
+      if (master && master.readyState === master.OPEN) {
+        master.send(JSON.stringify({ type: 'clientJoined', clientId, name, colorIndex }));
+      }
 
       ws.on('message', (data) => {
         let msg;
         try { msg = JSON.parse(data); } catch { return; }
+        const meta = clientMeta.get(ws) || {};
         if (master && master.readyState === master.OPEN) {
-          master.send(JSON.stringify({ ...msg, clientId }));
+          master.send(JSON.stringify({ ...msg, clientId, name: meta.name, colorIndex: meta.colorIndex }));
         }
       });
 
       ws.on('close', () => {
+        const meta = clientMeta.get(ws) || {};
+        clientMeta.delete(ws);
         clients.delete(ws);
         if (master && master.readyState === master.OPEN) {
-          master.send(JSON.stringify({ type: 'clientLeft', clientId }));
+          master.send(JSON.stringify({ type: 'clientLeft', clientId, name: meta.name }));
         }
       });
     }
