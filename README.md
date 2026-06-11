@@ -48,4 +48,5 @@ Open the displayed URL (or scan the QR code) on each participant's device. The p
 
 ## Todos
 
+- **Client viewport bar accuracy:** The per-client bars on the master view are a good approximation but not 100% accurate — real device browsers (especially iOS Safari) may report `window.innerHeight` differently than Chromium's proportional scaling assumes. Good enough for now.
 - **iOS fullscreen (Add to Home Screen):** Safari iOS doesn't support the Fullscreen API for web pages. Add `<meta name="apple-mobile-web-app-capable" content="yes">` and `<meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">` to `client.html`, plus a dismissable "Add to Home Screen for fullscreen" hint banner so clients know to use that flow.
