@@ -19,7 +19,7 @@ The server starts on port 3000 and displays:
 
 ### Clients
 
-Open the displayed URL (or scan the QR code) on each participant's device. The page will automatically follow the master's view.
+Open the displayed URL (or scan the QR code) on each participant's device. The page will automatically follow the master's view. A small debug badge in the bottom-right corner shows the client's assigned name and color, viewport dimensions, and current scroll position — useful for troubleshooting during a session. Scrollbars are hidden on all client views.
 
 ### Master
 
@@ -28,7 +28,7 @@ Open the displayed URL (or scan the QR code) on each participant's device. The p
 3. Tap the bookmarklet to enter **pick mode**:
    - The page dims and elements are highlighted as you hover or move your finger.
    - Tap an element to share just that content, or tap **"Share whole page"** to send everything.
-4. All clients immediately see the selected content and follow your scroll position.
+4. All clients immediately see the selected content and follow your scroll position. A master debug panel in the bottom-right shows connected clients and their viewport sizes; per-client scroll-position bars appear on the left edge.
 5. Navigate to a new song and tap the bookmarklet again — the previous session is cleanly replaced.
 
 **Selector memory:** After picking an element, the bookmarklet remembers your choice per domain. On the next tap on the same site, it auto-selects the saved element and shows a "Using saved element — change?" prompt, skipping full pick mode.

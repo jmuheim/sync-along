@@ -17,10 +17,33 @@ function waitForMessage(ws) {
   return new Promise((resolve) => ws.once('message', (data) => resolve(JSON.parse(data))));
 }
 
+// Waits for the next message of a specific type, skipping others.
+function waitForMessageOfType(ws, type) {
+  return new Promise((resolve) => {
+    function handler(data) {
+      const m = JSON.parse(data);
+      if (m.type === type) { ws.off('message', handler); resolve(m); }
+    }
+    ws.on('message', handler);
+  });
+}
+
 function wsConnect(port, role) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://localhost:${port}?role=${role}`);
     ws.once('open', () => resolve(ws));
+    ws.once('error', reject);
+  });
+}
+
+// Like wsConnect but collects all messages from the start (including those that
+// arrive before 'open' resolves, which can happen on loopback).
+function wsConnectCollecting(port, role) {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(`ws://localhost:${port}?role=${role}`);
+    const collected = [];
+    ws.on('message', (data) => collected.push(JSON.parse(data)));
+    ws.once('open', () => resolve({ ws, collected }));
     ws.once('error', reject);
   });
 }
@@ -68,19 +91,25 @@ describe('WebSocket server', () => {
     master.close(); client.close();
   });
 
-  it('does not echo messages back to master', async () => {
+  it('does not echo page/scroll messages back to master', async () => {
     const master = await wsConnect(port, 'master');
     const client = await wsConnect(port, 'client');
 
-    let masterReceived = false;
-    master.on('message', () => { masterReceived = true; });
+    // Drain the clientJoined message the server sends when client connects
+    await waitForMessage(master);
+
+    let masterEchoed = false;
+    master.on('message', (data) => {
+      const m = JSON.parse(data);
+      if (m.type === 'scroll' || m.type === 'page') masterEchoed = true;
+    });
 
     const p = waitForMessage(client);
     master.send(JSON.stringify({ type: 'scroll', y: 100 }));
     await p;
 
     await new Promise((r) => setTimeout(r, 50));
-    expect(masterReceived).toBe(false);
+    expect(masterEchoed).toBe(false);
 
     master.close(); client.close();
   });
@@ -132,9 +161,12 @@ describe('WebSocket server', () => {
     master.close(); client.close();
   });
 
-  it('forwards client message to master with injected clientId', async () => {
+  it('forwards client message to master with injected clientId, name, and colorIndex', async () => {
     const master = await wsConnect(port, 'master');
     const client = await wsConnect(port, 'client');
+
+    // Drain the clientJoined message sent on connect
+    await waitForMessage(master);
 
     const p = waitForMessage(master);
     client.send(JSON.stringify({ type: 'viewport', height: 812 }));
@@ -143,26 +175,26 @@ describe('WebSocket server', () => {
     expect(msg.type).toBe('viewport');
     expect(msg.height).toBe(812);
     expect(typeof msg.clientId).toBe('number');
+    expect(typeof msg.name).toBe('string');
+    expect(typeof msg.colorIndex).toBe('number');
 
     master.close(); client.close();
   });
 
-  it('sends clientLeft to master when a client disconnects', async () => {
+  it('sends clientLeft with clientId and name to master when a client disconnects', async () => {
     const master = await wsConnect(port, 'master');
     const client = await wsConnect(port, 'client');
 
-    // Capture the clientId assigned during connect
-    const viewportMsg = await new Promise((resolve) => {
-      client.send(JSON.stringify({ type: 'viewport', height: 100 }));
-      master.once('message', (data) => resolve(JSON.parse(data)));
-    });
-    const { clientId } = viewportMsg;
+    // First message is clientJoined — capture clientId and name from it
+    const joinedMsg = await waitForMessage(master);
+    expect(joinedMsg.type).toBe('clientJoined');
+    const { clientId, name } = joinedMsg;
 
     const leftPromise = waitForMessage(master);
     client.close();
     const leftMsg = await leftPromise;
 
-    expect(leftMsg).toEqual({ type: 'clientLeft', clientId });
+    expect(leftMsg).toEqual({ type: 'clientLeft', clientId, name });
 
     master.close();
   });
@@ -170,13 +202,64 @@ describe('WebSocket server', () => {
   it('sends requestViewport to existing clients when a new master connects', async () => {
     const client = await wsConnect(port, 'client');
 
-    const requestPromise = waitForMessage(client);
+    // Skip clientInfo (may arrive before waitForMessage is set up on loopback)
+    const requestPromise = waitForMessageOfType(client, 'requestViewport');
     await wsConnect(port, 'master');
     const msg = await requestPromise;
 
     expect(msg).toEqual({ type: 'requestViewport' });
 
     client.close();
+  });
+
+  it('sends clientInfo to newly connected client with name and colorIndex', async () => {
+    // Collect from the start so we don't miss clientInfo on loopback.
+    const { ws: client, collected } = await wsConnectCollecting(port, 'client');
+
+    const msg = await new Promise((resolve) => {
+      const found = collected.find((m) => m.type === 'clientInfo');
+      if (found) return resolve(found);
+      waitForMessageOfType(client, 'clientInfo').then(resolve);
+    });
+
+    expect(msg.type).toBe('clientInfo');
+    expect(typeof msg.name).toBe('string');
+    expect(msg.name.length).toBeGreaterThan(0);
+    expect(typeof msg.colorIndex).toBe('number');
+    expect(msg.colorIndex).toBeGreaterThanOrEqual(0);
+    expect(msg.colorIndex).toBeLessThan(5);
+
+    client.close();
+  });
+
+  it('sends clientJoined to master when a new client connects', async () => {
+    const master = await wsConnect(port, 'master');
+    const client = await wsConnect(port, 'client');
+    const msg = await waitForMessageOfType(master, 'clientJoined');
+
+    expect(msg.type).toBe('clientJoined');
+    expect(typeof msg.clientId).toBe('number');
+    expect(typeof msg.name).toBe('string');
+    expect(typeof msg.colorIndex).toBe('number');
+
+    master.close(); client.close();
+  });
+
+  it('announces existing clients to a reconnecting master', async () => {
+    const client = await wsConnect(port, 'client');
+
+    const { ws: master, collected } = await wsConnectCollecting(port, 'master');
+
+    const msg = await new Promise((resolve) => {
+      const found = collected.find((m) => m.type === 'clientJoined');
+      if (found) return resolve(found);
+      waitForMessageOfType(master, 'clientJoined').then(resolve);
+    });
+
+    expect(msg.type).toBe('clientJoined');
+    expect(typeof msg.name).toBe('string');
+
+    master.close(); client.close();
   });
 });
 

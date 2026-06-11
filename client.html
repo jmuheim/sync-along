@@ -2,45 +2,82 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
   <title>Sync Along client</title>
   <style>
+    html { scrollbar-width: none; }
+    html::-webkit-scrollbar { display: none; }
     body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #a8b2d8; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; text-align: center; padding: 2rem; }
     #status { font-size: 1.2rem; margin-bottom: 1rem; }
     #status.connected { color: #64ffda; }
     #status.disconnected { color: #e94560; }
     .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: currentColor; margin-right: 6px; }
+    #debug-bar { position: fixed; bottom: 0.5rem; right: 0.5rem; background: rgba(15,52,96,0.92); color: #a8b2d8; border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.72rem; font-family: system-ui, monospace, sans-serif; z-index: 9999; line-height: 1.6; border: 1px solid rgba(100,255,218,0.2); pointer-events: none; }
+    #debug-badge { background: #555; color: #0a0a1a; padding: 2px 8px; border-radius: 10px; font-weight: bold; font-size: 0.7rem; }
+    #debug-dims { color: #6b7db3; display: block; }
   </style>
 </head>
 <body>
+  <div id="debug-bar"><span id="debug-badge">—</span><span id="debug-dims">—</span></div>
   <p id="status" class="disconnected"><span class="dot"></span>Waiting for master…</p>
   <script>
     (function () {
+      var CLIENT_COLORS = ['#64ffda','#ff6b6b','#ffd93d','#6bcb77','#4d96ff'];
       var wsURL = 'ws://' + location.host + '?role=client';
       var lastRatio = -1;
       var ws = null;
       var resizeTimer = null;
+      var scrollTimer = null;
       var status = document.getElementById('status');
+      var debugBadge = document.getElementById('debug-badge');
+      var debugDims = document.getElementById('debug-dims');
+
+      function updateDebugDims() {
+        if (!debugDims) return;
+        var vpW = window.innerWidth, vpH = window.innerHeight;
+        var scrollY = Math.round(window.scrollY);
+        var pageH = document.documentElement.scrollHeight;
+        var pageW = document.documentElement.scrollWidth;
+        debugDims.textContent = 'VP ' + vpW + '×' + vpH + ' Scroll ' + scrollY + 'px Page ' + pageW + '×' + pageH;
+      }
 
       function sendViewport() {
         if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'viewport', height: window.innerHeight }));
+          ws.send(JSON.stringify({
+            type: 'viewport',
+            height: window.innerHeight,
+            width: window.innerWidth,
+            scrollY: Math.round(window.scrollY),
+            pageHeight: document.documentElement.scrollHeight,
+            pageWidth: document.documentElement.scrollWidth,
+          }));
         }
       }
 
-      // Re-send when browser window is resized — but only while this script is still
-      // in control (the injected client script sets __circleSyncClient when it takes over).
       window.addEventListener('resize', function () {
         if (window.__circleSyncClient) return;
         clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(sendViewport, 300);
+        resizeTimer = setTimeout(function () { sendViewport(); updateDebugDims(); }, 300);
       });
+
+      window.addEventListener('scroll', function () {
+        if (window.__circleSyncClient) return;
+        updateDebugDims();
+        clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(sendViewport, 500);
+      });
+
+      document.addEventListener('touchmove', function(e) {
+        if (e.scale !== undefined && e.scale !== 1) e.preventDefault();
+      }, { passive: false });
+      document.addEventListener('gesturestart', function(e) { e.preventDefault(); }, { passive: false });
+
+      updateDebugDims();
 
       function connect() {
         ws = new WebSocket(wsURL);
         ws.onopen = function () {
           if (status) { status.className = 'connected'; status.innerHTML = '<span class="dot"></span>Connected'; }
-          // Expose this WS so the injected script can close it cleanly when it takes over.
           window.__circleSyncClientWS = ws;
           sendViewport();
         };
@@ -61,12 +98,18 @@
               if ((down && m.ratio > clientRatio) || (!down && m.ratio < clientRatio))
                 window.scrollTo(0, m.ratio * scrollable);
             }
+            updateDebugDims();
           } else if (m.type === 'requestViewport') {
             sendViewport();
+          } else if (m.type === 'clientInfo') {
+            if (debugBadge) {
+              debugBadge.textContent = m.name;
+              debugBadge.style.background = CLIENT_COLORS[m.colorIndex % CLIENT_COLORS.length];
+            }
+            try { sessionStorage.setItem('__circleSyncId', JSON.stringify({ name: m.name, colorIndex: m.colorIndex })); } catch(e) {}
           }
         };
         ws.onclose = function () {
-          // Stop reconnecting once the injected script has taken over; it manages its own WS.
           if (window.__circleSyncClient) return;
           if (status) { status.className = 'disconnected'; status.innerHTML = '<span class="dot"></span>Reconnecting…'; }
           setTimeout(connect, 2000);
