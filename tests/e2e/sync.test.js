@@ -646,9 +646,9 @@ test('ratio 1.0 positions client at the true scrollable bottom, not past it', as
 
 // ─── Viewport zoom ─────────────────────────────────────────────────────────────
 
-test('picked sub-element: client receives viewport meta width matching element width', async ({ browser }) => {
-  const ctx = await browser.newContext({ viewport: { width: 800, height: 600 } });
-  const songPage = await ctx.newPage();
+test('picked sub-element: viewport meta scales CSS pixel viewport to element width on mobile client', async ({ browser }) => {
+  const masterCtx = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  const songPage = await masterCtx.newPage();
   await songPage.goto(BASE);
   await songPage.setContent(`
     <html><body style="margin:0">
@@ -660,7 +660,9 @@ test('picked sub-element: client receives viewport meta width matching element w
   await songPage.evaluate(buildBookmarkletSource(WS, clientScript));
   await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
 
-  const clientPage = await browser.newPage();
+  // Use a mobile context so viewport meta actually takes effect (desktop Chromium ignores it)
+  const mobileCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true });
+  const clientPage = await mobileCtx.newPage();
   await clientPage.goto(`${BASE}/client.html`);
   await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
 
@@ -673,8 +675,12 @@ test('picked sub-element: client receives viewport meta width matching element w
   );
   expect(viewportContent).toBe('width=200');
 
-  await ctx.close();
-  await clientPage.close();
+  // Confirm viewport meta took effect: mobile Chromium narrows the CSS pixel viewport to 200
+  const innerWidth = await clientPage.evaluate(() => window.innerWidth);
+  expect(innerWidth).toBe(200);
+
+  await masterCtx.close();
+  await mobileCtx.close();
 });
 
 test('"Share whole page" sends device-width viewport to clients', async ({ browser }) => {
@@ -755,15 +761,18 @@ test('master iframe body gets zoom applied to fill viewport width', async ({ bro
   await songPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(songPage.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
 
-  // Wait for the iframe load event to fire and zoom to be applied
+  // Wait for the iframe load event to fire and zoom to be applied, then confirm the
+  // body's rendered width fills the iframe (zoom visually correct, not just set)
   await expect(async () => {
-    const { width, zoom } = await songPage.evaluate(() => {
+    const { bodyRenderedWidth, iframeClientWidth } = await songPage.evaluate(() => {
       const iframe = document.querySelector('iframe#__circleSyncView');
       const body = iframe?.contentDocument?.body;
-      return { width: body?.style?.width, zoom: body?.style?.zoom };
+      return {
+        bodyRenderedWidth: body?.getBoundingClientRect().width,
+        iframeClientWidth: iframe?.clientWidth,
+      };
     });
-    expect(width).toBe('200px');
-    expect(parseFloat(zoom)).toBeGreaterThan(1);
+    expect(Math.abs(bodyRenderedWidth - iframeClientWidth)).toBeLessThan(2);
   }).toPass({ timeout: 5000 });
 
   await ctx.close();
