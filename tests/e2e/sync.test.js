@@ -643,3 +643,128 @@ test('ratio 1.0 positions client at the true scrollable bottom, not past it', as
   await masterPage.close();
   await clientPage.close();
 });
+
+// ─── Viewport zoom ─────────────────────────────────────────────────────────────
+
+test('picked sub-element: client receives viewport meta width matching element width', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  const songPage = await ctx.newPage();
+  await songPage.goto(BASE);
+  await songPage.setContent(`
+    <html><body style="margin:0">
+      <div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Song lyrics</p></div>
+    </body></html>
+  `);
+
+  const clientScript = buildClientScript(WS);
+  await songPage.evaluate(buildBookmarkletSource(WS, clientScript));
+  await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+
+  const clientPage = await browser.newPage();
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  const box = await songPage.locator('#lyrics').boundingBox();
+  await songPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(clientPage.getByText('Song lyrics')).toBeVisible({ timeout: 5000 });
+
+  const viewportContent = await clientPage.evaluate(() =>
+    document.querySelector('meta[name="viewport"]')?.content
+  );
+  expect(viewportContent).toBe('width=200');
+
+  await ctx.close();
+  await clientPage.close();
+});
+
+test('"Share whole page" sends device-width viewport to clients', async ({ browser }) => {
+  const ctx = await browser.newContext();
+  const songPage = await ctx.newPage();
+  await songPage.setContent(`<html><body><p id="content">Full content</p></body></html>`);
+
+  const clientScript = buildClientScript(WS);
+  await songPage.evaluate(buildBookmarkletSource(WS, clientScript));
+  await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+
+  const clientPage = await browser.newPage();
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  await songPage.getByText('Share whole page').click();
+  await expect(clientPage.locator('#content')).toBeVisible({ timeout: 5000 });
+
+  const viewportContent = await clientPage.evaluate(() =>
+    document.querySelector('meta[name="viewport"]')?.content
+  );
+  expect(viewportContent).toBe('width=device-width,initial-scale=1');
+
+  await ctx.close();
+  await clientPage.close();
+});
+
+test('source page viewport meta is stripped and replaced with element-width viewport', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  const songPage = await ctx.newPage();
+  await songPage.goto(BASE);
+  await songPage.setContent(`
+    <html>
+      <head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"></head>
+      <body style="margin:0">
+        <div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Lyrics</p></div>
+      </body>
+    </html>
+  `);
+
+  const clientScript = buildClientScript(WS);
+  await songPage.evaluate(buildBookmarkletSource(WS, clientScript));
+  await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+
+  const clientPage = await browser.newPage();
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  const box = await songPage.locator('#lyrics').boundingBox();
+  await songPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(clientPage.getByText('Lyrics')).toBeVisible({ timeout: 5000 });
+
+  const { count, content } = await clientPage.evaluate(() => {
+    const metas = document.querySelectorAll('meta[name="viewport"]');
+    return { count: metas.length, content: metas[0]?.content };
+  });
+  expect(count).toBe(1);
+  expect(content).toBe('width=200');
+
+  await ctx.close();
+  await clientPage.close();
+});
+
+test('master iframe body gets zoom applied to fill viewport width', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  const songPage = await ctx.newPage();
+  await songPage.goto(BASE);
+  await songPage.setContent(`
+    <html><body style="margin:0">
+      <div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Zoom test</p></div>
+    </body></html>
+  `);
+
+  const clientScript = buildClientScript(WS);
+  await songPage.evaluate(buildBookmarkletSource(WS, clientScript));
+  await expect(songPage.locator('#__circleSyncOverlay')).toBeAttached({ timeout: 5000 });
+  const box = await songPage.locator('#lyrics').boundingBox();
+  await songPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(songPage.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
+
+  // Wait for the iframe load event to fire and zoom to be applied
+  await expect(async () => {
+    const { width, zoom } = await songPage.evaluate(() => {
+      const iframe = document.querySelector('iframe#__circleSyncView');
+      const body = iframe?.contentDocument?.body;
+      return { width: body?.style?.width, zoom: body?.style?.zoom };
+    });
+    expect(width).toBe('200px');
+    expect(parseFloat(zoom)).toBeGreaterThan(1);
+  }).toPass({ timeout: 5000 });
+
+  await ctx.close();
+});
