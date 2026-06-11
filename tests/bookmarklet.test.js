@@ -1,3 +1,4 @@
+import vm from 'vm';
 import { describe, it, expect } from 'vitest';
 import { buildClientScript, buildBookmarkletSource, buildStubBookmarklet, buildBookmarkletCode } from '../lib/bookmarklet.js';
 
@@ -19,6 +20,13 @@ describe('buildClientScript', () => {
     expect(script).toContain('setTimeout(connect');
   });
 
+  it('re-sends viewport height on window resize via debounced listener', () => {
+    const script = buildClientScript(WS);
+    expect(script).toContain("addEventListener('resize'");
+    expect(script).toContain('clearTimeout(resizeTimer)');
+    expect(script).toContain('setTimeout(sendViewport');
+  });
+
   it('handles both page and scroll message types', () => {
     const script = buildClientScript(WS);
     expect(script).toContain("m.type==='page'");
@@ -35,6 +43,28 @@ describe('buildClientScript', () => {
   it('connects with role=client query param', () => {
     const script = buildClientScript(WS);
     expect(script).toContain('role=client');
+  });
+
+  it('sends window.innerHeight as viewport height on connect', () => {
+    const script = buildClientScript(WS);
+    expect(script).toContain('window.innerHeight');
+    expect(script).toContain("type:'viewport'");
+  });
+
+  it('re-sends viewport on requestViewport message', () => {
+    const script = buildClientScript(WS);
+    expect(script).toContain("m.type==='requestViewport'");
+    expect(script).toContain('sendViewport');
+  });
+
+  it('ws is declared at outer scope so resize listener always uses current connection', () => {
+    const script = buildClientScript(WS);
+    // ws must be declared before connect() so the resize listener (also at outer scope) can
+    // reference it without closing over a stale per-call local variable
+    const wsDecl = script.indexOf('var ws=null');
+    const connectDecl = script.indexOf('function connect()');
+    expect(wsDecl).toBeGreaterThan(-1);
+    expect(wsDecl).toBeLessThan(connectDecl);
   });
 });
 
@@ -96,6 +126,11 @@ describe('buildBookmarkletSource', () => {
 });
 
 describe('minified bookmarklet completeness', () => {
+  it('minified output is syntactically valid JavaScript', () => {
+    const code = buildBookmarkletCode('192.168.1.1', 3000);
+    expect(() => new vm.Script(code)).not.toThrow();
+  });
+
   it('still contains cleanup logic after minification', () => {
     const code = buildBookmarkletCode('192.168.1.1', 3000);
     expect(code).toContain('__circleSyncCleanup');
@@ -125,6 +160,18 @@ describe('minified bookmarklet completeness', () => {
     const source = buildBookmarkletSource(WS, buildClientScript(WS));
     expect(source).toContain('function onMouseDown');
     expect(source).toContain("removeEventListener('mousedown',onMouseDown");
+  });
+
+  it('shareBtn and onPick both use if/else for WS readyState so no open listener is orphaned', () => {
+    const source = buildBookmarkletSource(WS, buildClientScript(WS));
+    // Both sendPage call sites must check readyState first and only attach the open
+    // listener in the else branch — never unconditionally before the readyState check.
+    const ifElseMatches = source.match(
+      /if\(ws\.readyState===ws\.OPEN\)\{var h=sendPage\(/g
+    ) || [];
+    expect(ifElseMatches.length).toBe(2);
+    // Confirm neither call site adds the listener before the readyState check
+    expect(source).not.toMatch(/ws\.addEventListener\('open'[^)]+\);\s*if\(ws\.readyState/);
   });
 });
 
@@ -189,6 +236,36 @@ describe('proportional scroll — buildClientScript', () => {
   });
 });
 
+describe('client viewport bars — buildBookmarkletSource', () => {
+  const source = buildBookmarkletSource(WS, buildClientScript(WS));
+
+  it('handles viewport message from clients and stores height by clientId', () => {
+    expect(source).toContain("m.type==='viewport'");
+    expect(source).toContain('clients[m.clientId]');
+  });
+
+  it('handles clientLeft message and removes client from map', () => {
+    expect(source).toContain("m.type==='clientLeft'");
+    expect(source).toContain('delete clients[m.clientId]');
+  });
+
+  it('creates bars container with id __circleSyncBars for test selection', () => {
+    expect(source).toContain("clientBarsEl.id='__circleSyncBars'");
+  });
+
+  it('suppresses client script in master iframe via __circleSyncClient guard', () => {
+    expect(source).toContain('window.__circleSyncClient=true');
+  });
+
+  it('computes vMasterContent using zoom-aware iframe dimensions', () => {
+    expect(source).toContain('iframeVpH*lastElWidth/iframeVpW');
+  });
+
+  it('uses vMasterContent as reference height when computing bar fraction', () => {
+    expect(source).toContain('c.height/vMasterContent');
+  });
+});
+
 describe('proportional scroll — buildBookmarkletSource sendScroll', () => {
   it('uses viewportHeight in the denominator when computing the sent ratio', () => {
     const source = buildBookmarkletSource(WS, buildClientScript(WS));
@@ -198,39 +275,5 @@ describe('proportional scroll — buildBookmarkletSource sendScroll', () => {
   it('reads viewportHeight from the master iframe when it is open', () => {
     const source = buildBookmarkletSource(WS, buildClientScript(WS));
     expect(source).toContain('masterOverlay.contentWindow.innerHeight');
-  });
-});
-
-describe('band and arrow indicator', () => {
-  const source = buildBookmarkletSource(WS, buildClientScript(WS));
-
-  it('contains a left-pointing arrow character', () => {
-    expect(source).toContain('◄');
-  });
-
-  it('arrow uses a bright yellow colour', () => {
-    expect(source).toContain('#FFE600');
-  });
-
-  it('arrow has a contrasting text-shadow outline', () => {
-    expect(source).toContain('textShadow');
-  });
-
-  it('arrow is positioned on the right edge', () => {
-    expect(source).toContain("right:'0.3rem'");
-  });
-
-  it('arrow is removed when the band is removed', () => {
-    expect(source).toContain('arrowEl.remove()');
-  });
-
-  it('updateBand repositions the arrow via arrowEl.style.top', () => {
-    expect(source).toContain("arrowEl.style.top=");
-  });
-
-  it('cleanup path calls removeBand which tears down both band and arrow', () => {
-    // cleanup() calls removeBand(); that one call handles both elements
-    const cleanupSection = source.slice(source.indexOf('function cleanup('));
-    expect(cleanupSection).toContain('removeBand()');
   });
 });

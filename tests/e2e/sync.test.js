@@ -552,53 +552,377 @@ test('re-tapping bookmarklet cleans up previous WS and pick mode', async ({ brow
   await ctx.close();
 });
 
-// ─── Arrow indicator ───────────────────────────────────────────────────────────
+// ─── Client viewport bars ──────────────────────────────────────────────────────
 
-test('arrow indicator appears when master view opens and is removed on close', async ({ browser }) => {
-  const ctx = await browser.newContext({ viewport: { width: 800, height: 600 } });
-  const page = await ctx.newPage();
-  await page.goto(BASE);
-  await page.setContent(`<html><body style="margin:0"><div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Arrow test</p></div></body></html>`);
+test('viewport bar appears in #__circleSyncBars after client connects', async ({ browser }) => {
+  const masterCtx = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  const masterPage = await masterCtx.newPage();
+  await masterPage.goto(BASE);
+  await masterPage.setContent(`
+    <html><body style="margin:0">
+      <div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Song</p></div>
+    </body></html>
+  `);
+
+  const clientCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true });
+  const clientPage = await clientCtx.newPage();
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
 
   const clientScript = buildClientScript(WS);
-  const code = buildBookmarkletSource(WS, clientScript);
-  await page.evaluate(code);
+  await masterPage.evaluate(buildBookmarkletSource(WS, clientScript));
+  await expect(masterPage.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
 
-  await expect(page.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
-  const box = await page.locator('#lyrics').boundingBox();
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await expect(page.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
+  const box = await masterPage.locator('#lyrics').boundingBox();
+  await masterPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(masterPage.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
 
-  // Arrow must be present with the left-pointing character
-  const arrow = page.getByText('◄');
-  await expect(arrow).toBeVisible({ timeout: 3000 });
+  // After page replace, client reconnects and sends viewport → bar appears
+  await expect(async () => {
+    const trackCount = await masterPage.evaluate(() => {
+      const bars = document.getElementById('__circleSyncBars');
+      return bars ? bars.children.length : 0;
+    });
+    expect(trackCount).toBe(1);
+  }).toPass({ timeout: 5000 });
 
-  // Closing must remove the arrow
-  await page.locator('#__circleSyncCloseBtn').click();
-  await expect(page.locator('iframe#__circleSyncView')).not.toBeAttached({ timeout: 3000 });
-  await expect(arrow).not.toBeAttached();
-
-  await ctx.close();
+  await masterCtx.close();
+  await clientCtx.close();
 });
 
-test('arrow is positioned on the right side of the viewport', async ({ browser }) => {
-  const ctx = await browser.newContext({ viewport: { width: 800, height: 600 } });
-  const page = await ctx.newPage();
-  await page.goto(BASE);
-  await page.setContent(`<html><body style="margin:0"><div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Arrow position test</p></div></body></html>`);
+test('viewport bar is removed from #__circleSyncBars when client disconnects', async ({ browser }) => {
+  const masterCtx = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  const masterPage = await masterCtx.newPage();
+  await masterPage.goto(BASE);
+  await masterPage.setContent(`
+    <html><body style="margin:0">
+      <div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Song</p></div>
+    </body></html>
+  `);
 
-  const code = buildBookmarkletSource(WS, buildClientScript(WS));
-  await page.evaluate(code);
-  await expect(page.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
-  const box = await page.locator('#lyrics').boundingBox();
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await expect(page.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
+  const clientCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true });
+  const clientPage = await clientCtx.newPage();
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
 
-  const arrowBox = await page.getByText('◄').boundingBox();
-  // Arrow's left edge must be in the right half of the 800px viewport
-  expect(arrowBox.x).toBeGreaterThan(400);
+  await masterPage.evaluate(buildBookmarkletSource(WS, buildClientScript(WS)));
+  await expect(masterPage.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
+  const box = await masterPage.locator('#lyrics').boundingBox();
+  await masterPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(masterPage.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
 
-  await ctx.close();
+  // Wait for bar to appear
+  await expect(async () => {
+    const count = await masterPage.evaluate(() =>
+      document.getElementById('__circleSyncBars')?.children.length ?? 0
+    );
+    expect(count).toBe(1);
+  }).toPass({ timeout: 5000 });
+
+  // Close client → bar should disappear
+  await clientCtx.close();
+
+  await expect(async () => {
+    const count = await masterPage.evaluate(() =>
+      document.getElementById('__circleSyncBars')?.children.length ?? 0
+    );
+    expect(count).toBe(0);
+  }).toPass({ timeout: 5000 });
+
+  await masterCtx.close();
+});
+
+test('viewport bar height: client shorter than master → bar covers partial height', async ({ browser }) => {
+  // Master: 800×200, element W=200 → zoom=4 → vMasterContent = 200*200/800 = 50px
+  // Client: 800×100 (landscape, isMobile), receives width=200 page
+  //   Chromium proportional scaling: c.height = 100 * (200/800) = 25px
+  //   frac = 25/50 = 0.5 → thumbH = 100 (50% of master viewport height 200)
+  const masterCtx = await browser.newContext({ viewport: { width: 800, height: 200 } });
+  const masterPage = await masterCtx.newPage();
+  await masterPage.goto(BASE);
+  await masterPage.setContent(`
+    <html><body style="margin:0">
+      <div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Song</p></div>
+    </body></html>
+  `);
+
+  const clientCtx = await browser.newContext({ viewport: { width: 800, height: 100 }, isMobile: true });
+  const clientPage = await clientCtx.newPage();
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  const clientScript = buildClientScript(WS);
+  await masterPage.evaluate(buildBookmarkletSource(WS, clientScript));
+  await expect(masterPage.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
+
+  const box = await masterPage.locator('#lyrics').boundingBox();
+  await masterPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(masterPage.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
+
+  // Wait for bar to appear with exactly 1 track
+  await expect(async () => {
+    const count = await masterPage.evaluate(() =>
+      document.getElementById('__circleSyncBars')?.children.length ?? 0
+    );
+    expect(count).toBe(1);
+  }).toPass({ timeout: 5000 });
+
+  // Measure what client reports as window.innerHeight after page replace
+  const clientInnerH = await clientPage.evaluate(() => window.innerHeight);
+  // Chromium proportional: 100 * 200/800 = 25
+  expect(clientInnerH).toBe(25);
+
+  // Measure master iframe dimensions for vMasterContent
+  const { screenH, iframeVpH, iframeVpW } = await masterPage.evaluate(() => {
+    const iframe = document.querySelector('iframe#__circleSyncView');
+    return {
+      screenH: window.innerHeight,
+      iframeVpH: iframe?.contentWindow?.innerHeight ?? 0,
+      iframeVpW: iframe?.contentDocument?.documentElement?.clientWidth ?? 0,
+    };
+  });
+  // Desktop iframe: no meta effect → clientWidth=800, innerHeight=200
+  expect(iframeVpH).toBe(200);
+  expect(iframeVpW).toBe(800);
+
+  // vMasterContent = 200 * 200/800 = 50 content-px visible in master
+  const vMasterContent = iframeVpH * 200 / iframeVpW;
+  expect(vMasterContent).toBe(50);
+
+  // Bar thumb height: frac=25/50=0.5, thumbH=50% of track → 100px rendered
+  const thumbH = await masterPage.evaluate(() => {
+    const bars = document.getElementById('__circleSyncBars');
+    const thumb = bars?.children[0]?.children[0];
+    return thumb ? thumb.getBoundingClientRect().height : null;
+  });
+  const expectedThumbH = Math.min(1, clientInnerH / vMasterContent) * screenH;
+  expect(thumbH).toBeCloseTo(expectedThumbH, 0);
+  // Confirm it is a partial bar (< full height)
+  expect(thumbH).toBeLessThan(screenH);
+
+  await masterCtx.close();
+  await clientCtx.close();
+});
+
+test('viewport bar height: client taller than master → bar is full height', async ({ browser }) => {
+  // Master: 800×200, element W=200 → vMasterContent=50px
+  // Client: 390×844 (portrait phone, isMobile), receives width=200 page
+  //   Chromium proportional: c.height = 844 * (200/390) ≈ 433px >> 50px → full bar
+  const masterCtx = await browser.newContext({ viewport: { width: 800, height: 200 } });
+  const masterPage = await masterCtx.newPage();
+  await masterPage.goto(BASE);
+  await masterPage.setContent(`
+    <html><body style="margin:0">
+      <div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Song</p></div>
+    </body></html>
+  `);
+
+  const clientCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true });
+  const clientPage = await clientCtx.newPage();
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  const clientScript = buildClientScript(WS);
+  await masterPage.evaluate(buildBookmarkletSource(WS, clientScript));
+  await expect(masterPage.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
+
+  const box = await masterPage.locator('#lyrics').boundingBox();
+  await masterPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(masterPage.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
+
+  await expect(async () => {
+    const count = await masterPage.evaluate(() =>
+      document.getElementById('__circleSyncBars')?.children.length ?? 0
+    );
+    expect(count).toBe(1);
+  }).toPass({ timeout: 5000 });
+
+  const { screenH, iframeVpH, iframeVpW } = await masterPage.evaluate(() => {
+    const iframe = document.querySelector('iframe#__circleSyncView');
+    return {
+      screenH: window.innerHeight,
+      iframeVpH: iframe?.contentWindow?.innerHeight ?? 0,
+      iframeVpW: iframe?.contentDocument?.documentElement?.clientWidth ?? 0,
+    };
+  });
+  const clientInnerH = await clientPage.evaluate(() => window.innerHeight);
+  const vMasterContent = iframeVpH * 200 / iframeVpW;
+
+  // Client sees far more content than master → frac > 1 → full bar
+  expect(clientInnerH / vMasterContent).toBeGreaterThan(1);
+
+  const thumbH = await masterPage.evaluate(() => {
+    const bars = document.getElementById('__circleSyncBars');
+    const thumb = bars?.children[0]?.children[0];
+    return thumb ? thumb.getBoundingClientRect().height : null;
+  });
+  // Full bar: thumb fills the entire track (100%) → rendered height ≈ screenH
+  expect(thumbH).toBeCloseTo(screenH, 0);
+
+  await masterCtx.close();
+  await clientCtx.close();
+});
+
+test('viewport bar thumb moves from top to bottom as master scrolls', async ({ browser }) => {
+  // Single tall element (no children to intercept the pick-mode click)
+  const masterCtx = await browser.newContext({ viewport: { width: 800, height: 200 } });
+  const masterPage = await masterCtx.newPage();
+  await masterPage.goto(BASE);
+  await masterPage.setContent(`
+    <html><body style="margin:0">
+      <div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:1500px">
+        Scroll test content
+      </div>
+    </body></html>
+  `);
+
+  const clientCtx = await browser.newContext({ viewport: { width: 800, height: 100 }, isMobile: true });
+  const clientPage = await clientCtx.newPage();
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  const clientScript = buildClientScript(WS);
+  await masterPage.evaluate(buildBookmarkletSource(WS, clientScript));
+  await expect(masterPage.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
+
+  const box = await masterPage.locator('#lyrics').boundingBox();
+  await masterPage.mouse.click(box.x + 10, box.y + 10);
+  await expect(masterPage.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
+
+  await expect(async () => {
+    const count = await masterPage.evaluate(() =>
+      document.getElementById('__circleSyncBars')?.children.length ?? 0
+    );
+    expect(count).toBe(1);
+  }).toPass({ timeout: 5000 });
+
+  const getThumbTop = () => masterPage.evaluate(() => {
+    const bars = document.getElementById('__circleSyncBars');
+    const track = bars?.children[0];
+    const thumb = track?.children[0];
+    if (!track || !thumb) return null;
+    return thumb.getBoundingClientRect().top - track.getBoundingClientRect().top;
+  });
+
+  // At ratio=0 (top), thumb top should be 0
+  const topAtStart = await getThumbTop();
+  expect(topAtStart).toBeCloseTo(0, 0);
+
+  // Scroll master iframe to the bottom
+  await masterPage.evaluate(() => {
+    const iframe = document.querySelector('iframe#__circleSyncView');
+    if (iframe?.contentWindow) {
+      const doc = iframe.contentDocument.documentElement;
+      iframe.contentWindow.scrollTo(0, doc.scrollHeight - iframe.contentWindow.innerHeight);
+    }
+  });
+
+  // Wait for scroll timer to fire and bar to update
+  await expect(async () => {
+    const topAtEnd = await getThumbTop();
+    expect(topAtEnd).toBeGreaterThan(50);
+  }).toPass({ timeout: 3000 });
+
+  await masterCtx.close();
+  await clientCtx.close();
+});
+
+test('viewport bar updates when desktop client resizes the browser window', async ({ browser }) => {
+  // Desktop client (no isMobile): viewport meta has no scaling effect, innerHeight = window height.
+  // Master: 800×400, element W=200 → vMasterContent=100
+  // Client starts at 800×600: c.height=600 >> 100 → full bar (thumbH=400)
+  // After resize to 800×80: c.height=80 < 100 → frac=0.8 → thumbH=320
+  const masterCtx = await browser.newContext({ viewport: { width: 800, height: 400 } });
+  const masterPage = await masterCtx.newPage();
+  await masterPage.goto(BASE);
+  await masterPage.setContent(`
+    <html><body style="margin:0">
+      <div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Song</p></div>
+    </body></html>
+  `);
+
+  const clientCtx = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  const clientPage = await clientCtx.newPage();
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  const clientScript = buildClientScript(WS);
+  await masterPage.evaluate(buildBookmarkletSource(WS, clientScript));
+  await expect(masterPage.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
+
+  const box = await masterPage.locator('#lyrics').boundingBox();
+  await masterPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(masterPage.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
+
+  const getThumbH = () => masterPage.evaluate(() => {
+    const thumb = document.getElementById('__circleSyncBars')?.children[0]?.children[0];
+    return thumb ? thumb.getBoundingClientRect().height : null;
+  });
+
+  // Wait for bar to stabilise at full height (c.height=600 >> vMasterContent=100)
+  await expect(async () => {
+    expect(await getThumbH()).toBeCloseTo(400, 0);
+  }).toPass({ timeout: 5000 });
+
+  // Resize to a very short window so c.height < vMasterContent → partial bar
+  await clientPage.setViewportSize({ width: 800, height: 80 });
+
+  await expect(async () => {
+    const h = await getThumbH();
+    expect(h).toBeLessThan(400);
+  }).toPass({ timeout: 2000 });
+
+  await masterCtx.close();
+  await clientCtx.close();
+});
+
+test('viewport bar updates when client changes orientation', async ({ browser }) => {
+  // Master: 800×400, element W=200 → vMasterContent = 400*200/800 = 100px
+  // Portrait 390×844: c.height ≈ 844*(200/390) ≈ 433 >> 100 → full bar
+  // Landscape 844×390: c.height ≈ 390*(200/844) ≈ 92 < 100 → partial bar
+  const masterCtx = await browser.newContext({ viewport: { width: 800, height: 400 } });
+  const masterPage = await masterCtx.newPage();
+  await masterPage.goto(BASE);
+  await masterPage.setContent(`
+    <html><body style="margin:0">
+      <div id="lyrics" style="position:absolute;top:0;left:0;width:200px;height:50px"><p>Song</p></div>
+    </body></html>
+  `);
+
+  const clientCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true });
+  const clientPage = await clientCtx.newPage();
+  await clientPage.goto(`${BASE}/client.html`);
+  await expect(clientPage.locator('#status.connected')).toBeVisible({ timeout: 5000 });
+
+  const clientScript = buildClientScript(WS);
+  await masterPage.evaluate(buildBookmarkletSource(WS, clientScript));
+  await expect(masterPage.locator('#__circleSyncOverlay')).toBeVisible({ timeout: 5000 });
+
+  const box = await masterPage.locator('#lyrics').boundingBox();
+  await masterPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(masterPage.locator('iframe#__circleSyncView')).toBeVisible({ timeout: 5000 });
+
+  const getThumbH = () => masterPage.evaluate(() => {
+    const thumb = document.getElementById('__circleSyncBars')?.children[0]?.children[0];
+    return thumb ? thumb.getBoundingClientRect().height : null;
+  });
+
+  // Wait for portrait bar (full height = 400)
+  await expect(async () => {
+    expect(await getThumbH()).toBeCloseTo(400, 0);
+  }).toPass({ timeout: 5000 });
+
+  // Simulate rotation to landscape
+  await clientPage.setViewportSize({ width: 844, height: 390 });
+
+  // Bar should shrink: landscape c.height < vMasterContent → partial bar
+  await expect(async () => {
+    const h = await getThumbH();
+    expect(h).toBeLessThan(400);
+  }).toPass({ timeout: 2000 });
+
+  await masterCtx.close();
+  await clientCtx.close();
 });
 
 // ─── Proportional scroll — end-to-end ──────────────────────────────────────────

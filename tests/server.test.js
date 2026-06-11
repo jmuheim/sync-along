@@ -1,6 +1,17 @@
+import http from 'http';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import WebSocket from 'ws';
 import { createServer } from '../server.js';
+
+function httpGet(port, path) {
+  return new Promise((resolve, reject) => {
+    http.get(`http://localhost:${port}${path}`, (res) => {
+      let body = '';
+      res.on('data', (d) => body += d);
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body }));
+    }).on('error', reject);
+  });
+}
 
 function waitForMessage(ws) {
   return new Promise((resolve) => ws.once('message', (data) => resolve(JSON.parse(data))));
@@ -119,5 +130,106 @@ describe('WebSocket server', () => {
 
     expect(received).toBe(false);
     master.close(); client.close();
+  });
+
+  it('forwards client message to master with injected clientId', async () => {
+    const master = await wsConnect(port, 'master');
+    const client = await wsConnect(port, 'client');
+
+    const p = waitForMessage(master);
+    client.send(JSON.stringify({ type: 'viewport', height: 812 }));
+    const msg = await p;
+
+    expect(msg.type).toBe('viewport');
+    expect(msg.height).toBe(812);
+    expect(typeof msg.clientId).toBe('number');
+
+    master.close(); client.close();
+  });
+
+  it('sends clientLeft to master when a client disconnects', async () => {
+    const master = await wsConnect(port, 'master');
+    const client = await wsConnect(port, 'client');
+
+    // Capture the clientId assigned during connect
+    const viewportMsg = await new Promise((resolve) => {
+      client.send(JSON.stringify({ type: 'viewport', height: 100 }));
+      master.once('message', (data) => resolve(JSON.parse(data)));
+    });
+    const { clientId } = viewportMsg;
+
+    const leftPromise = waitForMessage(master);
+    client.close();
+    const leftMsg = await leftPromise;
+
+    expect(leftMsg).toEqual({ type: 'clientLeft', clientId });
+
+    master.close();
+  });
+
+  it('sends requestViewport to existing clients when a new master connects', async () => {
+    const client = await wsConnect(port, 'client');
+
+    const requestPromise = waitForMessage(client);
+    await wsConnect(port, 'master');
+    const msg = await requestPromise;
+
+    expect(msg).toEqual({ type: 'requestViewport' });
+
+    client.close();
+  });
+});
+
+describe('HTTP routes', () => {
+  let server, port;
+
+  beforeEach(async () => {
+    server = createServer();
+    await new Promise((resolve) => server.httpServer.listen(0, resolve));
+    port = server.httpServer.address().port;
+  });
+
+  afterEach(() => {
+    server.wss.close();
+    server.httpServer.close();
+  });
+
+  it('GET / returns 200 HTML', async () => {
+    const { status, headers, body } = await httpGet(port, '/');
+    expect(status).toBe(200);
+    expect(headers['content-type']).toContain('text/html');
+    expect(body).toContain('Sync Along');
+  });
+
+  it('GET /client.html returns 200 HTML', async () => {
+    const { status, headers, body } = await httpGet(port, '/client.html');
+    expect(status).toBe(200);
+    expect(headers['content-type']).toContain('text/html');
+    expect(body).toContain('Sync Along client');
+  });
+
+  it('GET /bookmarklet-code.js returns JS with no-store header', async () => {
+    const { status, headers, body } = await httpGet(port, '/bookmarklet-code.js');
+    expect(status).toBe(200);
+    expect(headers['content-type']).toContain('application/javascript');
+    expect(headers['cache-control']).toBe('no-store');
+    expect(body).toContain('role=master');
+  });
+
+  it('GET /dev returns 200 HTML', async () => {
+    const { status, headers, body } = await httpGet(port, '/dev');
+    expect(status).toBe(200);
+    expect(headers['content-type']).toContain('text/html');
+    expect(body).toContain('Sync Along Dev');
+  });
+
+  it('GET /unknown returns 404', async () => {
+    const { status } = await httpGet(port, '/unknown-path');
+    expect(status).toBe(404);
+  });
+
+  it('GET /demos/nonexistent.html returns 404', async () => {
+    const { status } = await httpGet(port, '/demos/nonexistent.html');
+    expect(status).toBe(404);
   });
 });

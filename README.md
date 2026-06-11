@@ -46,6 +46,17 @@ Open the displayed URL (or scan the QR code) on each participant's device. The p
 
 - No authentication, no database, no external services — entirely local.
 
+## Bookmarklet size
+
+The bookmarklet currently uses a **fetch+eval loader** pattern: the dragged bookmark is a tiny ~258-char stub that fetches the real code from the server on every tap. The full minified logic is ~12 KB, which as an inline `javascript:` URL would be ~15 KB.
+
+Modern browsers handle inline bookmarklets of that size without issues (Chrome has a ~2 MB limit; Firefox and Safari have no meaningful hard limit). So size is **not a blocker** for inlining all code into the bookmark itself.
+
+The loader pattern is kept for a different reason: during development you drag it once and always get the latest server-side code on every tap — no re-dragging needed after changes. If the bookmarklet were inlined, you'd need to re-save it after every code change.
+
+If the code ever needs to shrink further (e.g. for a standalone distribution), the main levers are replacing the custom `minify()` function in `lib/bookmarklet.js` with a proper tool like `terser`, and more aggressive variable-name shortening.
+
 ## Todos
 
-- **Precise client viewport indicator:** Currently the master sees a gradient hint that moves with scroll position to approximate where small-screen clients are looking. A more accurate alternative: have each client send `{ type: 'viewport', width, height }` over WebSocket on connect and resize; the server relays aggregated `{ type: 'clients', minHeight }` back to the master; the master then renders an exact overlay band showing where the smallest connected client's viewport currently falls.
+- **Client viewport bar accuracy:** The per-client bars on the master view are a good approximation but not 100% accurate — real device browsers (especially iOS Safari) may report `window.innerHeight` differently than Chromium's proportional scaling assumes. Good enough for now.
+- **iOS fullscreen (Add to Home Screen):** Safari iOS doesn't support the Fullscreen API for web pages. Add `<meta name="apple-mobile-web-app-capable" content="yes">` and `<meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">` to `client.html`, plus a dismissable "Add to Home Screen for fullscreen" hint banner so clients know to use that flow.

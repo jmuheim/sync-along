@@ -31,4 +31,16 @@ describe('getLocalIP', () => {
     const { getLocalIP } = await import('../lib/network.js');
     expect(getLocalIP()).toBe('127.0.0.1');
   });
+
+  it('recognises numeric family 4 (Node ≥ 18 changed family from string to number)', async () => {
+    vi.doMock('os', () => ({
+      default: {
+        networkInterfaces: () => ({
+          en0: [{ family: 4, address: '10.0.0.5', internal: false }],
+        }),
+      },
+    }));
+    const { getLocalIP } = await import('../lib/network.js');
+    expect(getLocalIP()).toBe('10.0.0.5');
+  });
 });
